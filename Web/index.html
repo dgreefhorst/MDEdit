@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MDEdit</title>
+<style>
+:root{--bg:#f6f5f1;--surface:#fff;--ink:#1f2328;--muted:#6b7280;--line:#dcdad2;--accent:#1d5fd0;--accent-soft:#e6eefb;--code:#f0eee8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17181a;--surface:#1f2123;--ink:#e6e6e3;--muted:#9a9a96;--line:#34363a;--accent:#6ea2ff;--accent-soft:#25324a;--code:#2a2c30;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17181a;--surface:#1f2123;--ink:#e6e6e3;--muted:#9a9a96;--line:#34363a;--accent:#6ea2ff;--accent-soft:#25324a;--code:#2a2c30;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+*{box-sizing:border-box}
+body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+header h1{font-size:15px;margin:0 8px 0 0;font-weight:650}
+.tb{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+button,select{font:inherit;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;min-height:30px}
+button:hover{background:var(--accent-soft)}
+button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+.spacer{flex:1}
+select{border-color:var(--line);background:var(--surface)}
+main{flex:1;min-height:0;display:flex}
+.pane{flex:1;min-width:0;overflow:auto;background:var(--surface)}
+.pane+.pane{border-left:1px solid var(--line)}
+#editor{max-width:820px;margin:0 auto;padding:28px 24px 80px;outline:none;min-height:100%}
+#src{width:100%;height:100%;border:0;resize:none;padding:24px;background:var(--surface);color:var(--ink);font:13.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;outline:none}
+.hide{display:none}
+#editor h1,#editor h2,#editor h3,#editor h4{line-height:1.25;margin:1.4em 0 .5em}
+#editor h1{font-size:2em;border-bottom:1px solid var(--line);padding-bottom:.25em}
+#editor h2{font-size:1.5em}#editor h3{font-size:1.2em}
+#editor p{margin:.7em 0}
+#editor a{color:var(--accent)}
+#editor blockquote{margin:1em 0;padding:.2em 1em;border-left:4px solid var(--accent);color:var(--muted)}
+#editor code{background:var(--code);padding:.15em .35em;border-radius:4px;font:.9em ui-monospace,Menlo,Consolas,monospace}
+#editor pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto}
+#editor pre code{background:none;padding:0}
+#editor img{max-width:100%}
+#editor hr{border:0;border-top:1px solid var(--line);margin:1.5em 0}
+#editor table{border-collapse:collapse;margin:1em 0;max-width:100%}
+#editor th,#editor td{border:1px solid var(--line);padding:6px 10px;min-width:60px}
+#editor th{background:var(--code)}
+#editor ul,#editor ol{padding-left:1.6em}
+#editor li input[type=checkbox]{margin-right:.4em}
+footer{display:flex;gap:16px;padding:4px 12px;font-size:12px;color:var(--muted);background:var(--surface);border-top:1px solid var(--line)}
+#toast{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
+@media (max-width:700px){main.split{flex-direction:column}.pane+.pane{border-left:0;border-top:1px solid var(--line)}#editor{padding:18px 14px 60px}}
+.grp{display:flex;flex-wrap:wrap;gap:2px;align-items:center}
+.ic{display:inline-flex;align-items:center;gap:5px}
+.ic svg{display:block;width:16px;height:16px}
+#modes button{padding:4px 7px}
+#imgDlg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:20}
+#imgDlg .dlg{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(440px,90vw);display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+#imgDlg h2{font-size:15px;margin:0}
+#imgDlg input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+#imgDlg .row{display:flex;gap:8px;align-items:center}
+#imgDlg .row button{min-width:0}
+.app header{display:none!important}
+.app #fn,.app #saved{display:none!important}
+</style>
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/turndown.js"></script>
+</head>
+<body>
+<header>
+  <h1>MDEdit</h1>
+  <button id="bNew" title="Nieuw document">Nieuw</button>
+  <button id="bOpen" title="Open .md bestand">Openen</button>
+  <button id="bSave" class="primary" title="Opslaan (Ctrl+S) — schrijft direct naar het geopende bestand">Opslaan</button>
+  <button id="bSaveAs" title="Opslaan als nieuw bestand">Opslaan als…</button>
+  <label id="autoWrap" class="hide" style="font-size:13px;color:var(--muted);display:flex;gap:4px;align-items:center" title="Wijzigingen automatisch naar het bestand schrijven"><input type="checkbox" id="auto">Auto-opslaan</label>
+  <span class="spacer"></span>
+  <button id="bTheme" title="Thema wisselen">◐</button>
+  <input type="file" id="file" accept=".md,.markdown,.txt,text/markdown,text/plain" class="hide">
+</header>
+<div class="tb" id="tb">
+  <div class="grp" id="fmt">
+    <select id="blk" title="Blokstijl">
+      <option value="p">Alinea</option><option value="h1">Kop 1</option><option value="h2">Kop 2</option><option value="h3">Kop 3</option><option value="h4">Kop 4</option><option value="blockquote">Citaat</option><option value="pre">Codeblok</option>
+    </select>
+    <span class="sep"></span>
+    <button data-c="bold" title="Vet (Ctrl+B)"><b>B</b></button>
+    <button data-c="italic" title="Cursief (Ctrl+I)"><i>I</i></button>
+    <button data-c="strikeThrough" title="Doorhalen"><s>S</s></button>
+    <button data-c="code" title="Inline code">&lt;/&gt;</button>
+    <button data-c="quote" id="bQuote" title="Citaat">❝ Citaat</button>
+    <button data-c="codeblock" id="bCodeBlock" title="Codeblok">{ } Codeblok</button>
+    <span class="sep"></span>
+    <button data-c="insertUnorderedList" title="Opsomming">• Lijst</button>
+    <button data-c="insertOrderedList" title="Genummerde lijst">1. Lijst</button>
+    <button data-c="task" title="Takenlijst">☑ Taak</button>
+    <span class="sep"></span>
+    <button data-c="link" title="Link (Ctrl+K)">Link</button>
+    <button data-c="image" title="Afbeelding invoegen (URL of bestand)">Afbeelding</button>
+    <button data-c="table" title="Tabel invoegen">Tabel</button>
+    <button data-c="insertHorizontalRule" title="Horizontale lijn">―</button>
+    <span class="sep"></span>
+    <button data-c="undo" title="Ongedaan (Ctrl+Z)">↶</button>
+    <button data-c="redo" title="Opnieuw (Ctrl+Y)">↷</button>
+    <button data-c="removeFormat" title="Opmaak wissen">Tx</button>
+  </div>
+  <span class="spacer"></span>
+  <div id="modes">
+    <button data-m="wysiwyg" class="on ic" title="Editor" aria-label="Editor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+    <button data-m="split" class="ic" title="Gesplitst" aria-label="Gesplitst"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg></button>
+    <button data-m="source" class="ic" title="Markdown-bron" aria-label="Markdown-bron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg></button>
+  </div>
+  <span class="sep"></span>
+  <button id="bExpHtml" class="ic" title="Exporteren naar HTML"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>HTML</span></button>
+  <button id="bExpWord" class="ic" title="Exporteren naar MS Word"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Word</span></button>
+</div>
+<main id="main">
+  <div class="pane" id="pe"><div id="editor" contenteditable="true" spellcheck="true"></div></div>
+  <div class="pane hide" id="ps"><textarea id="src" spellcheck="false" placeholder="Markdown…"></textarea></div>
+</main>
+<footer><span id="fn">document.md</span><span id="stat">0 woorden</span><span id="saved"></span></footer>
+<div id="toast"></div>
+<div id="imgDlg" class="hide">
+  <div class="dlg">
+    <h2>Afbeelding invoegen</h2>
+    <input id="imgUrl" type="text" placeholder="https://… (of pad)">
+    <input id="imgAlt" type="text" placeholder="Alternatieve tekst (optioneel)">
+    <div class="row">
+      <button id="imgPick">Bestand kiezen…</button>
+      <span class="spacer"></span>
+      <button id="imgCancel">Annuleren</button>
+      <button id="imgOk" class="primary">Invoegen</button>
+    </div>
+    <input id="imgFile" type="file" accept="image/*" class="hide">
+  </div>
+</div>
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const ed=$('#editor'), src=$('#src'), main=$('#main');
+marked.setOptions({gfm:true,breaks:false});
+const td=new TurndownService({headingStyle:'atx',codeBlockStyle:'fenced',bulletListMarker:'-',emDelimiter:'*',strongDelimiter:'**',hr:'---'});
+td.addRule('strike',{filter:['del','s','strike'],replacement:c=>'~~'+c+'~~'});
+td.addRule('task',{filter:n=>n.nodeName==='INPUT'&&n.type==='checkbox',replacement:(c,n)=>n.checked?'[x] ':'[ ] '});
+td.addRule('table',{filter:'table',replacement:(c,n)=>{
+  const rows=[...n.rows].map(r=>[...r.cells].map(x=>td.turndown(x.innerHTML).replace(/\n+/g,' ').replace(/\|/g,'\\|').trim()));
+  if(!rows.length)return '';
+  const w=Math.max(...rows.map(r=>r.length));
+  const pad=r=>{while(r.length<w)r.push('');return '| '+r.join(' | ')+' |'};
+  const out=[pad(rows[0]),'| '+Array(w).fill('---').join(' | ')+' |',...rows.slice(1).map(pad)];
+  return '\n\n'+out.join('\n')+'\n\n';}});
+td.keep([]);
+
+function clean(html){
+  const t=document.createElement('template'); t.innerHTML=html;
+  t.content.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(e=>e.remove());
+  t.content.querySelectorAll('*').forEach(e=>{[...e.attributes].forEach(a=>{
+    const n=a.name.toLowerCase();
+    if(n.startsWith('on')||(['href','src'].includes(n)&&/^\s*javascript:/i.test(a.value)))e.removeAttribute(a.name);
+    else if(!['href','src','alt','title','type','checked','colspan','rowspan','start','class'].includes(n))e.removeAttribute(a.name);
+  });});
+  return t.innerHTML;
+}
+const toHTML=md=>clean(marked.parse(md||''));
+const toMD=()=>td.turndown(ed.innerHTML).trim()+'\n';
+
+let mode='wysiwyg', lock=false, timer=null, fromNative=false, bridgeReady=false;
+function stats(){const t=src.value.replace(/[#>*_`~\-\[\]()|!]/g,' ').trim();$('#stat').textContent=(t?t.split(/\s+/).length:0)+' woorden · '+src.value.length+' tekens'}
+function persist(){if(bridgeReady&&!fromNative&&window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.md)webkit.messageHandlers.md.postMessage(src.value);dirty=true;label();clearTimeout(timer);timer=setTimeout(()=>{try{localStorage.setItem('md-editor-doc',src.value)}catch(e){}
+  if(handle&&dirty&&$('#auto').checked)writeHandle().catch(()=>{$('#saved').textContent='Auto-opslaan mislukt'});},500)}
+const pe=$('#pe');let raf=0,syncing=false;
+// Editor -> Markdown: elke DOM-wijziging (typen, knoppen, undo/redo, plakken, vinkjes) werkt de bron direct bij
+const mo=new MutationObserver(()=>{if(!lock){cancelAnimationFrame(raf);raf=requestAnimationFrame(fromEditor)}});
+mo.observe(ed,{childList:true,subtree:true,characterData:true,attributes:true});
+function fromEditor(){
+  if(lock)return;lock=true;
+  const md=toMD();
+  if(md!==src.value){
+    const st=src.scrollTop,a=src.selectionStart,b=src.selectionEnd,f=document.activeElement===src;
+    src.value=md;src.scrollTop=st;
+    if(f)src.setSelectionRange(Math.min(a,md.length),Math.min(b,md.length));
+  }
+  lock=false;stats();persist();
+}
+// Markdown -> editor: bij elke toetsaanslag opnieuw renderen, scrollpositie behouden
+function renderEditor(md){lock=true;const st=pe.scrollTop;ed.innerHTML=toHTML(md);mo.takeRecords();pe.scrollTop=st;lock=false}
+function fromSource(){renderEditor(src.value);stats();persist()}
+function setMD(md){src.value=md;renderEditor(md);stats();persist()}
+src.addEventListener('input',fromSource);
+// Scroll synchroon houden in gesplitste weergave
+function link(a,b){a.addEventListener('scroll',()=>{if(mode!=='split'||syncing)return;syncing=true;const r=a.scrollTop/Math.max(1,a.scrollHeight-a.clientHeight);b.scrollTop=r*(b.scrollHeight-b.clientHeight);requestAnimationFrame(()=>syncing=false)})}
+link(pe,src);link(src,pe);
+
+function setMode(m){
+  mode=m;
+  $('#pe').classList.toggle('hide',m==='source');
+  $('#ps').classList.toggle('hide',m==='wysiwyg');
+  main.classList.toggle('split',m==='split');
+  document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  $('#fmt').style.display=m==='source'?'none':'flex';
+  if(m==='source')src.focus(); else ed.focus();
+}
+$('#modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m)});
+
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800)}
+function exec(c,v){ed.focus();document.execCommand(c,false,v);fromEditor();sync()}
+function selHTML(){const s=getSelection();if(!s.rangeCount)return '';const d=document.createElement('div');d.appendChild(s.getRangeAt(0).cloneContents());return d.innerHTML}
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function insertHTML(h){exec('insertHTML',h)}
+
+function action(c){
+  ed.focus();
+  switch(c){
+    case 'code':{const s=getSelection().toString();
+      const p=getSelection().anchorNode&&getSelection().anchorNode.parentElement;
+      if(p&&p.closest('code')&&!p.closest('pre')){const cd=p.closest('code');cd.replaceWith(document.createTextNode(cd.textContent));fromEditor();}
+      else insertHTML('<code>'+(esc(s)||'code')+'</code>&nbsp;');break}
+    case 'quote':exec('formatBlock',currentBlock()==='blockquote'?'p':'blockquote');break;
+    case 'codeblock':exec('formatBlock',currentBlock()==='pre'?'p':'pre');break;
+    case 'task':insertHTML('<ul><li><input type="checkbox">&nbsp;'+(esc(getSelection().toString())||'Taak')+'</li></ul>');break;
+    case 'link':{const u=prompt('URL van de link:','https://');if(u){getSelection().isCollapsed?insertHTML('<a href="'+esc(u)+'">'+esc(u)+'</a>'):exec('createLink',u)}break}
+    case 'image':openImageDialog();break;
+    case 'table':{const r=parseInt(prompt('Aantal rijen (excl. kop):','2'),10),k=parseInt(prompt('Aantal kolommen:','3'),10);
+      if(r>0&&k>0){let h='<table><thead><tr>'+Array.from({length:k},(_,i)=>'<th>Kop '+(i+1)+'</th>').join('')+'</tr></thead><tbody>';
+        for(let i=0;i<r;i++)h+='<tr>'+'<td>&nbsp;</td>'.repeat(k)+'</tr>';insertHTML(h+'</tbody></table><p><br></p>')}break}
+    default:exec(c);
+  }
+}
+$('#tb').addEventListener('mousedown',e=>{if(e.target.closest('button'))e.preventDefault()});
+$('#tb').addEventListener('click',e=>{const b=e.target.closest('button');if(b)action(b.dataset.c)});
+$('#blk').addEventListener('change',e=>{const v=e.target.value;exec('formatBlock',v==='p'?'p':v);});
+
+// Afbeelding invoegen: via URL of via een lokaal bestand
+let savedRange=null;
+function saveSel(){const s=getSelection();savedRange=(s&&s.rangeCount)?s.getRangeAt(0).cloneRange():null}
+function restoreSel(){
+  const s=getSelection();s.removeAllRanges();
+  if(savedRange){try{s.addRange(savedRange);return}catch(e){}}
+  const r=document.createRange();r.selectNodeContents(ed);r.collapse(false);s.addRange(r);
+}
+function insertImage(src,alt){
+  ed.focus();restoreSel();
+  document.execCommand('insertHTML',false,'<img src="'+esc(src)+'" alt="'+esc(alt)+'">');
+  fromEditor();sync();
+}
+const imgDlg=$('#imgDlg');
+function openImageDialog(){$('#imgUrl').value='';$('#imgAlt').value='';saveSel();imgDlg.classList.remove('hide');$('#imgUrl').focus()}
+function closeImageDialog(){imgDlg.classList.add('hide')}
+$('#imgCancel').onclick=closeImageDialog;
+imgDlg.addEventListener('mousedown',e=>{if(e.target===imgDlg)closeImageDialog()});
+$('#imgUrl').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#imgOk').click()}});
+$('#imgOk').onclick=()=>{
+  const u=$('#imgUrl').value.trim();
+  if(!u){toast('Voer een URL in of kies een bestand');return}
+  const a=$('#imgAlt').value.trim();closeImageDialog();insertImage(u,a);
+};
+$('#imgPick').onclick=()=>$('#imgFile').click();
+$('#imgFile').addEventListener('change',e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(f.type&&!/^image\//.test(f.type)){toast('Kies een afbeeldingsbestand');return}
+  const alt=$('#imgAlt').value.trim(),r=new FileReader();
+  r.onload=()=>{closeImageDialog();insertImage(String(r.result),alt)};
+  r.onerror=()=>toast('Bestand lezen mislukt');
+  r.readAsDataURL(f);
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!imgDlg.classList.contains('hide'))closeImageDialog()});
+
+function currentBlock(){
+  const s=getSelection();if(!s.anchorNode||!ed.contains(s.anchorNode))return 'p';
+  let n=s.anchorNode.nodeType===3?s.anchorNode.parentElement:s.anchorNode;
+  while(n&&n!==ed&&!/^(P|H[1-6]|BLOCKQUOTE|PRE|LI|DIV)$/.test(n.nodeName))n=n.parentElement;
+  return n&&n!==ed?n.nodeName.toLowerCase():'p';
+}
+function sync(){
+  if(!getSelection().anchorNode||!ed.contains(getSelection().anchorNode))return;
+  const t=currentBlock();
+  $('#blk').value=['h1','h2','h3','h4','blockquote','pre'].includes(t)?t:'p';
+  $('#bQuote').classList.toggle('on',t==='blockquote');
+  $('#bCodeBlock').classList.toggle('on',t==='pre');
+}
+document.addEventListener('selectionchange',sync);
+
+// Markdown-sneltoetsen tijdens typen: "# ", "- ", "1. ", "> ", "```", "---"
+ed.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();action('link');return}
+  if(e.key!==' '&&e.key!=='Enter')return;
+  const s=getSelection();if(!s.isCollapsed||!s.anchorNode||s.anchorNode.nodeType!==3)return;
+  const blk=s.anchorNode.parentElement.closest('p,div');if(!blk||blk===ed||blk.closest('li,pre'))return;
+  const txt=blk.textContent;
+  if(e.key===' '){
+    const m=txt.match(/^(#{1,4}|-|\*|\d+\.|>|\[\])$/);if(!m)return;
+    e.preventDefault();blk.textContent='';
+    const k=m[1];
+    if(k[0]==='#')exec('formatBlock','h'+k.length);
+    else if(k==='-'||k==='*')exec('insertUnorderedList');
+    else if(k==='>')exec('formatBlock','blockquote');
+    else if(k==='[]')action('task');
+    else exec('insertOrderedList');
+  }else if(txt==='---'){e.preventDefault();blk.textContent='';exec('insertHorizontalRule')}
+  else if(txt==='```'){e.preventDefault();blk.textContent='';exec('formatBlock','pre')}
+});
+ed.addEventListener('paste',e=>{
+  const h=e.clipboardData.getData('text/html'),t=e.clipboardData.getData('text/plain');
+  e.preventDefault();
+  if(h)insertHTML(clean(h)); else if(t)insertHTML(toHTML(t));
+});
+ed.addEventListener('click',e=>{
+  if(e.target.matches('input[type=checkbox]')){if(e.target.checked)e.target.setAttribute('checked','');else e.target.removeAttribute('checked');fromEditor()}
+  const a=e.target.closest('a');if(a&&(e.ctrlKey||e.metaKey)){window.open(a.href,'_blank','noopener')}
+});
+
+// Bestanden
+let fname='document.md';
+const fsa='showOpenFilePicker' in window;
+const ftypes=[{description:'Markdown',accept:{'text/markdown':['.md','.markdown'],'text/plain':['.txt']}}];
+let handle=null,dirty=false;
+function label(){$('#fn').textContent=(handle?'🔗 ':'')+fname+(dirty?' •':'');$('#autoWrap').classList.toggle('hide',!handle)}
+async function openPicker(){
+  try{
+    const [h]=await showOpenFilePicker({types:ftypes,multiple:false});
+    const f=await h.getFile(),text=await f.text();
+    handle=h;fname=f.name;setMD(text);dirty=false;label();
+    toast('Geopend: '+f.name+' — opslaan schrijft direct naar dit bestand');
+  }catch(e){if(e&&e.name==='AbortError')return;toast('Directe bestandstoegang niet beschikbaar hier; gewone upload gebruikt');$('#file').click()}
+}
+$('#bOpen').onclick=()=>fsa?openPicker():$('#file').click();
+window.addEventListener('beforeunload',e=>{if(dirty&&handle){e.preventDefault();e.returnValue=''}});
+$('#file').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;fname=f.name.match(/\.(md|markdown)$/i)?f.name:f.name.replace(/\.[^.]*$/,'')+'.md';
+  const r=new FileReader();r.onload=()=>{handle=null;setMD(String(r.result));dirty=false;label();toast('Geopend: '+f.name)};r.readAsText(f);e.target.value='';
+});
+$('#bNew').onclick=()=>{if(!src.value.trim()||confirm('Huidig document wissen?')){handle=null;setMD('');fname='document.md';dirty=false;label();ed.focus()}};
+async function writeHandle(){
+  const w=await handle.createWritable();
+  await w.write(src.value);await w.close();
+  dirty=false;label();$('#saved').textContent='Opgeslagen om '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+async function save(){
+  if(handle){
+    try{await writeHandle();toast('Opgeslagen in '+fname);return}
+    catch(e){if(e&&e.name==='AbortError')return;toast('Schrijven mislukt — kies een nieuwe locatie');handle=null;label()}
+  }
+  return saveAs();
+}
+async function saveAs(){
+  if(window.showSaveFilePicker){
+    try{
+      const h=await showSaveFilePicker({suggestedName:fname,types:ftypes});
+      handle=h;fname=h.name;await writeHandle();toast('Opgeslagen als '+fname);return;
+    }catch(e){if(e&&e.name==='AbortError')return}
+  }
+  return dlSave();
+}
+async function dlSave(){
+  const name=prompt('Bestandsnaam:',fname);if(!name)return;
+  fname=/\.(md|markdown)$/i.test(name)?name:name+'.md';
+  try{
+    const d=window.claude&&await claude.use('downloads');
+    if(d){await d.save({filename:fname,data:src.value});toast('Opgeslagen als '+fname);return}
+  }catch(e){if(e&&e.code&&/declin|cancel|denied/i.test(e.code+e.message)){return}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([src.value],{type:'text/markdown'}));a.download=fname;document.body.appendChild(a);a.click();a.remove();
+  toast('Opgeslagen als '+fname);
+}
+$('#bSave').onclick=save;
+$('#bSaveAs').onclick=saveAs;
+
+// Exporteren: HTML en echt .docx (OOXML)
+function docName(ext){return fname.replace(/\.(md|markdown|txt)$/i,'')+ext}
+function docHTML(title,body){
+  return '<!DOCTYPE html><html lang="nl"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'
+    +'<style>body{max-width:820px;margin:2rem auto;padding:0 1rem;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1f2328}'
+    +'pre{background:#f0eee8;padding:12px 14px;border-radius:8px;overflow-x:auto}code{background:#f0eee8;padding:.15em .35em;border-radius:4px;font:.9em ui-monospace,Menlo,Consolas,monospace}'
+    +'pre code{background:none;padding:0}blockquote{margin:1em 0;padding:.2em 1em;border-left:4px solid #1d5fd0;color:#6b7280}'
+    +'table{border-collapse:collapse}th,td{border:1px solid #dcdad2;padding:6px 10px}th{background:#f0eee8}img{max-width:100%}a{color:#1d5fd0}</style></head><body>'+body+'</body></html>';
+}
+
+// Minimale ZIP-bouwer (opslag zonder compressie) — genoeg voor een .docx
+const CRC_TABLE=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(b){let c=0xffffffff;for(let i=0;i<b.length;i++)c=CRC_TABLE[(c^b[i])&0xff]^(c>>>8);return (c^0xffffffff)>>>0}
+function zipBytes(files){
+  const e=new TextEncoder(),parts=[],dir=[];let off=0;
+  const u16=n=>[n&255,(n>>>8)&255],u32=n=>[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];
+  const d=new Date(),dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xffff;
+  const dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xffff;
+  for(const f of files){
+    const name=e.encode(f.name),data=f.data,crc=crc32(data);
+    const lh=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0),...u16(0),...u16(dt),...u16(dd),...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),...u16(0),...name]);
+    parts.push(lh,data);
+    dir.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0),...u16(0),...u16(dt),...u16(dd),...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off),...name]));
+    off+=lh.length+data.length;
+  }
+  let cdSize=0;for(const c of dir)cdSize+=c.length;
+  const eocd=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cdSize),...u32(off),...u16(0)]);
+  const all=[...parts,...dir,eocd];let total=0;for(const p of all)total+=p.length;
+  const out=new Uint8Array(total);let o=0;for(const p of all){out.set(p,o);o+=p.length}
+  return out;
+}
+
+// HTML -> OOXML (word/document.xml)
+function xe(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+// Afbeeldingen ophalen voor de docx
+function b64Bytes(b){const s=atob(b);const o=new Uint8Array(s.length);for(let i=0;i<s.length;i++)o[i]=s.charCodeAt(i);return o}
+function extFromBytes(b){
+  if(b.length<4)return '';
+  if(b[0]===0x89&&b[1]===0x50&&b[2]===0x4e&&b[3]===0x47)return 'png';
+  if(b[0]===0xff&&b[1]===0xd8&&b[2]===0xff)return 'jpeg';
+  if(b[0]===0x47&&b[1]===0x49&&b[2]===0x46)return 'gif';
+  if(b[0]===0x42&&b[1]===0x4d)return 'bmp';
+  if(b[0]===0x52&&b[1]===0x49&&b[2]===0x46&&b[3]===0x46&&b[8]===0x57&&b[9]===0x45&&b[10]===0x42&&b[11]===0x50)return 'webp';
+  if((b[0]===0x49&&b[1]===0x49&&b[2]===0x2a)||(b[0]===0x4d&&b[1]===0x4d&&b[2]===0x00&&b[3]===0x2a))return 'tiff';
+  return '';
+}
+function extFromMime(m){m=String(m||'').toLowerCase().split(';')[0].trim();return {'image/png':'png','image/jpeg':'jpeg','image/jpg':'jpeg','image/gif':'gif','image/bmp':'bmp','image/webp':'webp','image/tiff':'tiff'}[m]||''}
+function extFromUrl(u){const m=String(u).split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i);const e=m?m[1].toLowerCase():'';return ['png','jpeg','jpg','gif','bmp','webp','tiff','tif'].includes(e)?(e==='jpg'?'jpeg':e==='tif'?'tiff':e):''}
+function mimeForExt(e){return {png:'image/png',jpeg:'image/jpeg',gif:'image/gif',bmp:'image/bmp',webp:'image/webp',tiff:'image/tiff'}[e]||'application/octet-stream'}
+async function fetchImageDirect(src){
+  try{
+    if(/^data:/i.test(src)){
+      const m=/^data:([^;,]*)(;base64)?,([\s\S]*)$/i.exec(src);if(!m)return null;
+      const bytes=m[2]?b64Bytes(m[3]):new TextEncoder().encode(decodeURIComponent(m[3]));
+      const ext=extFromBytes(bytes)||extFromMime(m[1]);return ext?{bytes:bytes,ext:ext}:null;
+    }
+    const r=await fetch(src,{mode:'cors'});
+    if(!r.ok)return null;
+    const bytes=new Uint8Array(await r.arrayBuffer());
+    const ext=extFromBytes(bytes)||extFromMime(r.headers.get('content-type'))||extFromUrl(src);
+    return ext?{bytes:bytes,ext:ext}:null;
+  }catch(e){return null}
+}
+async function imageDims(bytes){
+  try{const bmp=await createImageBitmap(new Blob([bytes]));const d={w:bmp.width||600,h:bmp.height||400};if(bmp.close)bmp.close();return d}catch(e){}
+  return new Promise(res=>{const u=URL.createObjectURL(new Blob([bytes])),im=new Image();im.onload=()=>{res({w:im.naturalWidth||600,h:im.naturalHeight||400});URL.revokeObjectURL(u)};im.onerror=()=>{res({w:600,h:400});URL.revokeObjectURL(u)};im.src=u});
+}
+let imgReqN=0;const imgWait={};
+function nativeImages(urls){return new Promise(res=>{const id='img'+(++imgReqN);imgWait[id]=res;webkit.messageHandlers.images.postMessage({id:id,urls:urls})})}
+window.__imagesResult=function(id,res){const f=imgWait[id];if(f){delete imgWait[id];f(res)}};
+
+async function docxBytes(md){
+  const tpl=document.createElement('template');tpl.innerHTML=toHTML(md);
+  const hyper=[];let hid=3,imgN=0,docPrN=0;
+  const media=[],exts=new Set(),picMap=new Map();
+  function linkRel(url){const id='rId'+(hid++);hyper.push('<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="'+xe(url)+'" TargetMode="External"/>');return id}
+  // Afbeeldingen ophalen: data-URL of directe fetch, anders via de native brug
+  const imgs=[...tpl.content.querySelectorAll('img')].filter(i=>i.getAttribute('src'));
+  const pending=[];
+  for(const img of imgs){
+    const src=img.getAttribute('src');
+    const got=await fetchImageDirect(src);
+    if(got)picMap.set(img,got); else pending.push([img,src]);
+  }
+  if(pending.length&&bridgeReady&&window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.images){
+    const res=await nativeImages(pending.map(p=>p[1]));
+    pending.forEach((p,i)=>{
+      const r=res&&res[i];
+      if(r&&r.ok&&r.data){const b=b64Bytes(r.data);const ext=extFromBytes(b)||extFromMime(r.mime||'')||extFromUrl(p[1]);if(ext)picMap.set(p[0],{bytes:b,ext:ext})}
+    });
+  }
+  const EMU=9525,MAXW=6120130,picInfo=new Map();
+  for(const [img,got] of [...picMap]){
+    const name='image'+(++imgN)+'.'+got.ext,id='rId'+(hid++);
+    media.push({name:'word/media/'+name,data:got.bytes});exts.add(got.ext);
+    hyper.push('<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+name+'"/>');
+    const d=await imageDims(got.bytes),sc=d.w*EMU>MAXW?MAXW/(d.w*EMU):1;
+    picInfo.set(img,{id:id,cx:Math.max(1,Math.round(d.w*EMU*sc)),cy:Math.max(1,Math.round(d.h*EMU*sc))});
+  }
+  function draw(img){
+    const m=picInfo.get(img);if(!m)return '';
+    const dn=++docPrN;
+    return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
+      +'<wp:extent cx="'+m.cx+'" cy="'+m.cy+'"/><wp:effectExtent l="0" t="0" r="0" b="0"/>'
+      +'<wp:docPr id="'+dn+'" name="Afbeelding '+dn+'"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>'
+      +'<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>'
+      +'<pic:nvPicPr><pic:cNvPr id="'+dn+'" name="Afbeelding '+dn+'"/><pic:cNvPicPr/></pic:nvPicPr>'
+      +'<pic:blipFill><a:blip r:embed="'+m.id+'"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+      +'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+m.cx+'" cy="'+m.cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
+      +'</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  }
+  function run(text,fmt){
+    fmt=fmt||{};let rpr='';
+    if(fmt.code)rpr+='<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/>';
+    if(fmt.b)rpr+='<w:b/>';
+    if(fmt.i)rpr+='<w:i/>';
+    if(fmt.strike)rpr+='<w:strike/>';
+    if(fmt.link)rpr+='<w:color w:val="1D5FD0"/><w:u w:val="single"/>';
+    if(fmt.code)rpr+='<w:shd w:val="clear" w:color="auto" w:fill="F0EEE8"/>';
+    const sp=/^\s|\s$|\s\s/.test(text)?' xml:space="preserve"':'';
+    return '<w:r>'+(rpr?'<w:rPr>'+rpr+'</w:rPr>':'')+'<w:t'+sp+'>'+xe(text)+'</w:t></w:r>';
+  }
+  function runs(node,fmt){
+    let out='';
+    node.childNodes.forEach(n=>{
+      if(n.nodeType===3){if(n.nodeValue)out+=run(n.nodeValue,fmt);return}
+      if(n.nodeType!==1)return;
+      const tag=n.tagName.toLowerCase();
+      if(tag==='br'){out+='<w:r><w:br/></w:r>';return}
+      if(tag==='ul'||tag==='ol'||tag==='input')return;
+      if(tag==='img'){out+=draw(n);return}
+      if(tag==='a'&&n.getAttribute('href')){const id=linkRel(n.getAttribute('href'));out+='<w:hyperlink r:id="'+id+'">'+runs(n,Object.assign({},fmt,{link:true}))+'</w:hyperlink>';return}
+      const f=Object.assign({},fmt);
+      if(tag==='strong'||tag==='b')f.b=true;
+      if(tag==='em'||tag==='i')f.i=true;
+      if(tag==='del'||tag==='s'||tag==='strike')f.strike=true;
+      if(tag==='code')f.code=true;
+      out+=runs(n,f);
+    });
+    return out;
+  }
+  function para(ppr,content){return '<w:p>'+(ppr?'<w:pPr>'+ppr+'</w:pPr>':'')+content+'</w:p>'}
+  function quote(el){
+    const ppr='<w:pStyle w:val="Quote"/><w:pBdr><w:left w:val="single" w:sz="18" w:space="8" w:color="1D5FD0"/></w:pBdr><w:ind w:left="360"/>';
+    let out='';
+    el.childNodes.forEach(n=>{
+      if(n.nodeType===1&&/^(p|h[1-6]|ul|ol|pre|blockquote|table)$/i.test(n.tagName))out+=para(ppr,runs(n,{}));
+      else if(n.nodeType===3&&n.nodeValue.trim())out+=para(ppr,run(n.nodeValue,{}));
+    });
+    return out||para(ppr,'');
+  }
+  function code(el){
+    const ppr='<w:pStyle w:val="CodeBlock"/><w:shd w:val="clear" w:color="auto" w:fill="F0EEE8"/><w:spacing w:before="0" w:after="0"/>';
+    return el.textContent.replace(/\n$/,'').split('\n').map(l=>para(ppr,run(l||' ',{code:true}))).join('');
+  }
+  function list(el,ordered,level){
+    let out='';
+    [...el.children].forEach(li=>{
+      if(li.tagName.toLowerCase()!=='li')return;
+      const cb=li.querySelector('input[type=checkbox]');
+      if(cb){
+        const mark=(cb.hasAttribute('checked')||cb.checked)?'☒ ':'☐ ';
+        out+=para('<w:ind w:left="360"/>',run(mark,{})+runs(li,{}));
+      }else{
+        out+=para('<w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="'+Math.min(level,8)+'"/><w:numId w:val="'+(ordered?2:1)+'"/></w:numPr>',runs(li,{}));
+      }
+      [...li.children].forEach(sub=>{
+        const st=sub.tagName.toLowerCase();
+        if(st==='ul')out+=list(sub,false,level+1);
+        else if(st==='ol')out+=list(sub,true,level+1);
+      });
+    });
+    return out;
+  }
+  function tbl(el){
+    let out='<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>'+['top','left','bottom','right','insideH','insideV'].map(s=>'<w:'+s+' w:val="single" w:sz="6" w:space="0" w:color="999999"/>').join('')+'</w:tblBorders></w:tblPr>';
+    [...el.querySelectorAll('tr')].forEach(tr=>{
+      out+='<w:tr>';
+      [...tr.children].forEach(cell=>{
+        const th=cell.tagName.toLowerCase()==='th';
+        out+='<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/>'+(th?'<w:shd w:val="clear" w:color="auto" w:fill="F0EEE8"/>':'')+'</w:tcPr>'+para('',runs(cell,th?{b:true}:{}))+'</w:tc>';
+      });
+      out+='</w:tr>';
+    });
+    return out+'</w:tbl><w:p/>';
+  }
+  function blocks(el){
+    let out='';
+    el.childNodes.forEach(n=>{
+      if(n.nodeType===3){if(n.nodeValue.trim())out+=para('',run(n.nodeValue,{}));return}
+      if(n.nodeType!==1)return;
+      const tag=n.tagName.toLowerCase();
+      if(/^h[1-4]$/.test(tag)){out+=para('<w:pStyle w:val="Heading'+tag[1]+'"/>',runs(n,{}));return}
+      switch(tag){
+        case 'p':out+=para('',runs(n,{}));break;
+        case 'blockquote':out+=quote(n);break;
+        case 'pre':out+=code(n);break;
+        case 'ul':out+=list(n,false,0);break;
+        case 'ol':out+=list(n,true,0);break;
+        case 'table':out+=tbl(n);break;
+        case 'img':out+=para('',draw(n));break;
+        case 'hr':out+=para('<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="DCDAD2"/></w:pBdr>','');break;
+        case 'div':out+=blocks(n);break;
+        default:if(n.textContent.trim())out+=para('',runs(n,{}));
+      }
+    });
+    return out;
+  }
+  const body=blocks(tpl.content)+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>';
+  const enc=new TextEncoder();
+  const documentXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>'+body+'</w:body></w:document>';
+  const contentTypes='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    +'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    +'<Default Extension="xml" ContentType="application/xml"/>'
+    +[...exts].map(e=>'<Default Extension="'+e+'" ContentType="'+mimeForExt(e)+'"/>').join('')
+    +'<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    +'<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+    +'<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>'
+    +'</Types>';
+  const pkgRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  const docRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+    +'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>'
+    +hyper.join('')+'</Relationships>';
+  const stylesXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+    +'<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault>'
+    +'<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
+    +'<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="320" w:after="120"/></w:pPr><w:rPr><w:b/><w:sz w:val="40"/><w:szCs w:val="40"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="280" w:after="100"/></w:pPr><w:rPr><w:b/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="80"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="200" w:after="80"/></w:pPr><w:rPr><w:b/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:i/><w:color w:val="555555"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="CodeBlock"><w:name w:val="Code Block"/><w:basedOn w:val="Normal"/><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/></w:style>'
+    +'</w:styles>';
+  const bullet=['•','◦','▪'].map((g,i)=>'<w:lvl w:ilvl="'+i+'"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="'+g+'"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="'+(720+i*360)+'" w:hanging="360"/></w:pPr></w:lvl>').join('');
+  const decimal=[0,1,2].map(i=>'<w:lvl w:ilvl="'+i+'"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%'+(i+1)+'."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="'+(720+i*360)+'" w:hanging="360"/></w:pPr></w:lvl>').join('');
+  const numberingXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+    +'<w:abstractNum w:abstractNumId="0">'+bullet+'</w:abstractNum>'
+    +'<w:abstractNum w:abstractNumId="1">'+decimal+'</w:abstractNum>'
+    +'<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>'
+    +'<w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>'
+    +'</w:numbering>';
+  return zipBytes([
+    {name:'[Content_Types].xml',data:enc.encode(contentTypes)},
+    {name:'_rels/.rels',data:enc.encode(pkgRels)},
+    {name:'word/document.xml',data:enc.encode(documentXml)},
+    {name:'word/_rels/document.xml.rels',data:enc.encode(docRels)},
+    {name:'word/styles.xml',data:enc.encode(stylesXml)},
+    {name:'word/numbering.xml',data:enc.encode(numberingXml)}
+  ].concat(media));
+}
+function toBase64(bytes){let s='';const c=0x8000;for(let i=0;i<bytes.length;i+=c)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+c));return btoa(s)}
+function deliverFile(filename,mime,content,binary){
+  if(bridgeReady&&window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.export){
+    webkit.messageHandlers.export.postMessage(binary
+      ?{filename:filename,mime:mime,encoding:'base64',data:toBase64(content)}
+      :{filename:filename,mime:mime,text:content});
+    return;
+  }
+  try{
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+    a.download=filename;document.body.appendChild(a);a.click();a.remove();toast('Geëxporteerd: '+filename);
+  }catch(e){toast('Exporteren mislukt')}
+}
+async function exportDoc(kind){
+  if(kind==='word')deliverFile(docName('.docx'),'application/vnd.openxmlformats-officedocument.wordprocessingml.document',await docxBytes(src.value),true);
+  else deliverFile(docName('.html'),'text/html',docHTML(docName('')||'document',toHTML(src.value)));
+}
+$('#bExpHtml').onclick=()=>exportDoc('html');
+$('#bExpWord').onclick=()=>{toast('Word-bestand maken…');exportDoc('word')};
+
+
+// Thema
+$('#bTheme').onclick=()=>{
+  const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme=dark?'light':'dark';
+};
+
+// Start
+const demo=`# Welkom bij MDEdit
+
+Schrijf **vet**, *cursief* of ~~doorgehaald~~ in de editor, of wissel naar de *Markdown*-weergave.
+
+## Sneltoetsen tijdens typen
+
+- Typ \`# \` voor een kop, \`- \` voor een lijst, \`1. \` voor een genummerde lijst
+- Typ \`> \` voor een citaat, \`---\` voor een lijn
+- Ctrl+K voor een link, Ctrl+S om op te slaan
+
+- [x] Editor gebouwd
+- [ ] Eigen document schrijven
+
+| Kolom A | Kolom B |
+| --- | --- |
+| Een | Twee |
+
+> Alles wat je typt wordt direct als Markdown bijgehouden.
+`;
+let init=demo;try{init=localStorage.getItem('md-editor-doc')||demo}catch(e){}
+setMD(init);dirty=false;label();
+if(innerWidth>900)setMode('split');
+document.documentElement.classList.add('app');
+window.nativeSetText=function(md){bridgeReady=true;if(md===src.value)return;fromNative=true;setMD(md);fromNative=false;dirty=false;label()};
+window.__toast=toast;
+})();
+</script>
+</body>
+</html>
