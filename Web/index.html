@@ -110,6 +110,7 @@ footer{display:flex;gap:16px;padding:4px 12px;font-size:12px;color:var(--muted);
   <span class="sep"></span>
   <button id="bExpHtml" class="ic" title="Exporteren naar HTML"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>HTML</span></button>
   <button id="bExpWord" class="ic" title="Exporteren naar MS Word"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Word</span></button>
+  <button id="bExpWiki" class="ic" title="Exporteren naar MediaWiki-markup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Wiki</span></button>
 </div>
 <main id="main">
   <div class="pane" id="pe"><div id="editor" contenteditable="true" spellcheck="true"></div></div>
@@ -369,6 +370,79 @@ function docHTML(title,body){
     +'pre{background:#f0eee8;padding:12px 14px;border-radius:8px;overflow-x:auto}code{background:#f0eee8;padding:.15em .35em;border-radius:4px;font:.9em ui-monospace,Menlo,Consolas,monospace}'
     +'pre code{background:none;padding:0}blockquote{margin:1em 0;padding:.2em 1em;border-left:4px solid #1d5fd0;color:#6b7280}'
     +'table{border-collapse:collapse}th,td{border:1px solid #dcdad2;padding:6px 10px}th{background:#f0eee8}img{max-width:100%}a{color:#1d5fd0}</style></head><body>'+body+'</body></html>';
+}
+
+// Markdown -> MediaWiki-markup
+function wikiName(u){const m=String(u||'').split(/[?#]/)[0].match(/([^\/\\]+)$/);return (m&&m[1])||'image.png'}
+function wikiInline(node){
+  let out='';
+  node.childNodes.forEach(n=>{
+    if(n.nodeType===3){out+=n.nodeValue.replace(/\n+/g,' ');return}
+    if(n.nodeType!==1)return;
+    const t=n.tagName.toLowerCase();
+    if(t==='ul'||t==='ol'||t==='input')return;
+    if(t==='br'){out+='<br />';return}
+    if(t==='strong'||t==='b'){out+="'''"+wikiInline(n)+"'''";return}
+    if(t==='em'||t==='i'){out+="''"+wikiInline(n)+"''";return}
+    if(t==='del'||t==='s'||t==='strike'){out+='<s>'+wikiInline(n)+'</s>';return}
+    if(t==='sub'){out+='<sub>'+wikiInline(n)+'</sub>';return}
+    if(t==='sup'){out+='<sup>'+wikiInline(n)+'</sup>';return}
+    if(t==='code'){out+='<code>'+n.textContent+'</code>';return}
+    if(t==='a'&&n.getAttribute('href')){const h=n.getAttribute('href'),x=wikiInline(n).trim();out+='['+h+(x&&x!==h?' '+x:'')+']';return}
+    if(t==='img'){const a=n.getAttribute('alt')||'';out+='[[File:'+wikiName(n.getAttribute('src'))+(a?'|alt='+a:'')+']]';return}
+    out+=wikiInline(n);
+  });
+  return out;
+}
+function wikiList(el,ordered,level){
+  let out='';
+  [...el.children].forEach(li=>{
+    if(li.tagName.toLowerCase()!=='li')return;
+    const cb=li.querySelector('input[type=checkbox]');
+    let text=wikiInline(li).replace(/\n+/g,' ').trim();
+    if(cb)text=((cb.hasAttribute('checked')||cb.checked)?'☒ ':'☐ ')+text;
+    out+=(ordered?'#'.repeat(level+1):'*'.repeat(level+1))+' '+text+'\n';
+    [...li.children].forEach(sub=>{
+      const st=sub.tagName.toLowerCase();
+      if(st==='ul')out+=wikiList(sub,false,level+1);
+      else if(st==='ol')out+=wikiList(sub,true,level+1);
+    });
+  });
+  return out.replace(/\n+$/,'');
+}
+function wikiTable(el){
+  const rows=[...el.querySelectorAll('tr')];
+  if(!rows.length)return '';
+  return '{| class="wikitable"\n'+rows.map(tr=>'|-\n'+[...tr.children].map(c=>{
+    const th=c.tagName.toLowerCase()==='th';
+    return (th?'! ':'| ')+wikiInline(c).replace(/\n+/g,' ').trim();
+  }).join('\n')).join('\n')+'\n|}';
+}
+function wikiBlocks(el){
+  const parts=[];
+  el.childNodes.forEach(n=>{
+    if(n.nodeType===3){if(n.nodeValue.trim())parts.push(n.nodeValue.trim());return}
+    if(n.nodeType!==1)return;
+    const t=n.tagName.toLowerCase();
+    if(/^h[1-6]$/.test(t)){const e='='.repeat(+t[1]);parts.push(e+' '+wikiInline(n).trim()+' '+e);return}
+    switch(t){
+      case 'p':parts.push(wikiInline(n).trim());break;
+      case 'blockquote':parts.push('<blockquote>\n'+wikiBlocks(n).join('\n\n')+'\n</blockquote>');break;
+      case 'pre':{const c=n.querySelector('code'),m=c&&c.className.match(/language-([\w+#.-]+)/);
+        parts.push((m?'<syntaxhighlight lang="'+m[1]+'">\n':'<pre>\n')+n.textContent.replace(/\n$/,'')+'\n'+(m?'</syntaxhighlight>':'</pre>'));break}
+      case 'ul':parts.push(wikiList(n,false,0));break;
+      case 'ol':parts.push(wikiList(n,true,0));break;
+      case 'table':parts.push(wikiTable(n));break;
+      case 'hr':parts.push('----');break;
+      case 'div':parts.push(...wikiBlocks(n));break;
+      default:if(n.textContent.trim())parts.push(wikiInline(n).trim());
+    }
+  });
+  return parts;
+}
+function toWiki(md){
+  const tpl=document.createElement('template');tpl.innerHTML=toHTML(md);
+  return wikiBlocks(tpl.content).filter(Boolean).join('\n\n').trim()+'\n';
 }
 
 // Minimale ZIP-bouwer (opslag zonder compressie) — genoeg voor een .docx
@@ -636,10 +710,12 @@ function deliverFile(filename,mime,content,binary){
 }
 async function exportDoc(kind){
   if(kind==='word')deliverFile(docName('.docx'),'application/vnd.openxmlformats-officedocument.wordprocessingml.document',await docxBytes(src.value),true);
+  else if(kind==='wiki')deliverFile(docName('.mediawiki'),'text/plain',toWiki(src.value));
   else deliverFile(docName('.html'),'text/html',docHTML(docName('')||'document',toHTML(src.value)));
 }
 $('#bExpHtml').onclick=()=>exportDoc('html');
 $('#bExpWord').onclick=()=>{toast('Word-bestand maken…');exportDoc('word')};
+$('#bExpWiki').onclick=()=>{toast('MediaWiki-markup maken…');exportDoc('wiki')};
 
 
 // Thema
