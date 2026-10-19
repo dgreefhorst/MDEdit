@@ -13,6 +13,8 @@ html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
 body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
 header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
 header h1{font-size:15px;margin:0 8px 0 0;font-weight:650}
+#autoWrap{display:flex;gap:4px;align-items:center;font-size:13px;color:var(--muted)}
+#autoWrap.hide{display:none}
 .tb{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
 button,select{font:inherit;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;min-height:30px}
 button:hover{background:var(--accent-soft)}
@@ -52,6 +54,7 @@ footer{display:flex;gap:16px;padding:4px 12px;font-size:12px;color:var(--muted);
 .ic svg{display:block;width:16px;height:16px}
 #modes button{padding:4px 7px}
 #imgDlg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:20}
+#imgDlg.hide{display:none}
 #imgDlg .dlg{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(440px,90vw);display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 #imgDlg h2{font-size:15px;margin:0}
 #imgDlg input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
@@ -70,7 +73,7 @@ footer{display:flex;gap:16px;padding:4px 12px;font-size:12px;color:var(--muted);
   <button id="bOpen" title="Open .md bestand">Openen</button>
   <button id="bSave" class="primary" title="Opslaan (Ctrl+S) — schrijft direct naar het geopende bestand">Opslaan</button>
   <button id="bSaveAs" title="Opslaan als nieuw bestand">Opslaan als…</button>
-  <label id="autoWrap" class="hide" style="font-size:13px;color:var(--muted);display:flex;gap:4px;align-items:center" title="Wijzigingen automatisch naar het bestand schrijven"><input type="checkbox" id="auto">Auto-opslaan</label>
+  <label id="autoWrap" class="hide" title="Wijzigingen automatisch naar het bestand schrijven"><input type="checkbox" id="auto">Auto-opslaan</label>
   <span class="spacer"></span>
   <button id="bTheme" title="Thema wisselen">◐</button>
   <input type="file" id="file" accept=".md,.markdown,.txt,text/markdown,text/plain" class="hide">
@@ -166,7 +169,7 @@ let mode='wysiwyg', lock=false, timer=null, fromNative=false, bridgeReady=false;
 function stats(){const t=src.value.replace(/[#>*_`~\-\[\]()|!]/g,' ').trim();$('#stat').textContent=(t?t.split(/\s+/).length:0)+' woorden · '+src.value.length+' tekens'}
 function persist(){if(bridgeReady&&!fromNative&&window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.md)webkit.messageHandlers.md.postMessage(src.value);dirty=true;label();clearTimeout(timer);timer=setTimeout(()=>{try{localStorage.setItem('md-editor-doc',src.value)}catch(e){}
   if(handle&&dirty&&$('#auto').checked)writeHandle().catch(()=>{$('#saved').textContent='Auto-opslaan mislukt'});},500)}
-const pe=$('#pe');let raf=0,syncing=false;
+const pe=$('#pe');let raf=0,linking=new WeakSet;
 // Editor -> Markdown: elke DOM-wijziging (typen, knoppen, undo/redo, plakken, vinkjes) werkt de bron direct bij
 const mo=new MutationObserver(()=>{if(!lock){cancelAnimationFrame(raf);raf=requestAnimationFrame(fromEditor)}});
 mo.observe(ed,{childList:true,subtree:true,characterData:true,attributes:true});
@@ -186,7 +189,15 @@ function fromSource(){renderEditor(src.value);stats();persist()}
 function setMD(md){src.value=md;renderEditor(md);stats();persist()}
 src.addEventListener('input',fromSource);
 // Scroll synchroon houden in gesplitste weergave
-function link(a,b){a.addEventListener('scroll',()=>{if(mode!=='split'||syncing)return;syncing=true;const r=a.scrollTop/Math.max(1,a.scrollHeight-a.clientHeight);b.scrollTop=r*(b.scrollHeight-b.clientHeight);requestAnimationFrame(()=>syncing=false)})}
+function link(a,b){
+  a.addEventListener('scroll',()=>{
+    if(mode!=='split')return;
+    if(linking.has(a)){linking.delete(a);return}
+    const target=a.scrollTop/Math.max(1,a.scrollHeight-a.clientHeight)*Math.max(1,b.scrollHeight-b.clientHeight);
+    if(Math.abs(b.scrollTop-target)<1)return;
+    linking.add(b);b.scrollTop=target;
+  })
+}
 link(pe,src);link(src,pe);
 
 function setMode(m){
