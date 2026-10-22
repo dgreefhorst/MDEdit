@@ -21,6 +21,7 @@ final class ZoomOnAppearView: NSView {
 
 struct EditorView: NSViewRepresentable {
     @Binding var text: String
+    var fileURL: URL?
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -56,6 +57,8 @@ struct EditorView: NSViewRepresentable {
         var loaded = false
         var lastFromJS: String?
         var lastPushed: String?
+        var lastKind: String?
+        var lastName: String?
         var modeObserver: NSObjectProtocol?
 
         init(_ parent: EditorView) {
@@ -75,11 +78,17 @@ struct EditorView: NSViewRepresentable {
             if let observer = modeObserver { NotificationCenter.default.removeObserver(observer) }
         }
 
-        // Swift -> editor (nieuw document, terugzetten, wijziging op schijf)
+        // Swift -> editor (nieuw document, terugzetten, wijziging op schijf):
+        // tekst én soort (.md of .mmd) gaan in één call, zodat diagrammen nooit op de verkeerde tekst renderen
         func push(_ text: String) {
-            guard loaded, text != lastFromJS, text != lastPushed else { return }
+            guard loaded, text != lastFromJS else { return }
+            let kind = (parent.fileURL?.pathExtension ?? "").lowercased() == "mmd" ? "mmd" : "md"
+            let name = parent.fileURL?.lastPathComponent ?? ""
+            guard !(text == lastPushed && kind == lastKind && name == lastName) else { return }
             lastPushed = text
-            web?.callAsyncJavaScript("nativeSetText(t)", arguments: ["t": text], in: nil, in: .page, completionHandler: nil)
+            lastKind = kind
+            lastName = name
+            web?.callAsyncJavaScript("nativeSetDoc(k,n,t)", arguments: ["k": kind, "n": name, "t": text], in: nil, in: .page, completionHandler: nil)
         }
 
         // Editor -> Swift (elke wijziging of exportverzoek)
@@ -168,6 +177,7 @@ struct EditorView: NSViewRepresentable {
             push(parent.text)
             DispatchQueue.main.async { webView.window?.makeFirstResponder(webView) }
         }
+
 
         // Links openen in de standaardbrowser
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,

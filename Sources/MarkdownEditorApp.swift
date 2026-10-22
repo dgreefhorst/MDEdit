@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 extension UTType {
     static let markdownDoc = UTType(importedAs: "net.daringfireball.markdown")
+    static let mermaidDiagram = UTType(importedAs: "nl.mdedit.mermaid")
 }
 
 extension Notification.Name {
@@ -10,8 +11,8 @@ extension Notification.Name {
 }
 
 struct MarkdownDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.markdownDoc, .plainText] }
-    static var writableContentTypes: [UTType] { [.markdownDoc, .plainText] }
+    static var readableContentTypes: [UTType] { [.markdownDoc, .mermaidDiagram, .plainText] }
+    static var writableContentTypes: [UTType] { [.markdownDoc, .mermaidDiagram, .plainText] }
 
     var text: String
 
@@ -36,7 +37,7 @@ struct MarkdownDocument: FileDocument {
 struct MarkdownEditorApp: App {
     var body: some Scene {
         DocumentGroup(newDocument: MarkdownDocument()) { file in
-            EditorView(text: file.$document.text)
+            EditorView(text: file.$document.text, fileURL: file.fileURL)
                 .frame(minWidth: 600, minHeight: 400)
                 .background(WindowAccessor())
         }

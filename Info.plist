@@ -28,6 +28,14 @@
       <key>public.filename-extension</key><array><string>md</string><string>markdown</string><string>mdown</string></array>
       <key>public.mime-type</key><array><string>text/markdown</string></array>
     </dict>
+  </dict><dict>
+    <key>UTTypeIdentifier</key><string>nl.mdedit.mermaid</string>
+    <key>UTTypeDescription</key><string>Mermaid-diagram</string>
+    <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+    <key>UTTypeTagSpecification</key><dict>
+      <key>public.filename-extension</key><array><string>mmd</string></array>
+      <key>public.mime-type</key><array><string>text/plain</string></array>
+    </dict>
   </dict></array>
   <key>CFBundleDocumentTypes</key>
   <array>
@@ -36,6 +44,12 @@
       <key>CFBundleTypeRole</key><string>Editor</string>
       <key>LSHandlerRank</key><string>Default</string>
       <key>LSItemContentTypes</key><array><string>net.daringfireball.markdown</string></array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key><string>Mermaid-diagram</string>
+      <key>CFBundleTypeRole</key><string>Editor</string>
+      <key>LSHandlerRank</key><string>Default</string>
+      <key>LSItemContentTypes</key><array><string>nl.mdedit.mermaid</string></array>
     </dict>
     <dict>
       <key>CFBundleTypeName</key><string>Tekstdocument</string>
