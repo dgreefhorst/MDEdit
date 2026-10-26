@@ -30,6 +30,7 @@ struct EditorView: NSViewRepresentable {
         config.userContentController.add(context.coordinator, name: "md")
         config.userContentController.add(context.coordinator, name: "export")
         config.userContentController.add(context.coordinator, name: "images")
+        config.userContentController.add(context.coordinator, name: "links")
         let web = WKWebView(frame: .zero, configuration: config)
         web.navigationDelegate = context.coordinator
         web.uiDelegate = context.coordinator
@@ -49,6 +50,7 @@ struct EditorView: NSViewRepresentable {
         web.configuration.userContentController.removeScriptMessageHandler(forName: "md")
         web.configuration.userContentController.removeScriptMessageHandler(forName: "export")
         web.configuration.userContentController.removeScriptMessageHandler(forName: "images")
+        web.configuration.userContentController.removeScriptMessageHandler(forName: "links")
     }
 
     final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
@@ -60,6 +62,7 @@ struct EditorView: NSViewRepresentable {
         var lastKind: String?
         var lastName: String?
         var modeObserver: NSObjectProtocol?
+        var lastOpen = Date.distantPast
 
         init(_ parent: EditorView) {
             self.parent = parent
@@ -78,12 +81,23 @@ struct EditorView: NSViewRepresentable {
             if let observer = modeObserver { NotificationCenter.default.removeObserver(observer) }
         }
 
+        // Het document in dit venster is leidend: na het wisselen van document
+        // (link in hetzelfde venster) loopt parent.fileURL achter.
+        private var document: NSDocument? {
+            guard let controller = web?.window?.windowController else { return nil }
+            return controller.document as? NSDocument
+        }
+
+        private var currentURL: URL? {
+            document?.fileURL ?? parent.fileURL
+        }
+
         // Swift -> editor (nieuw document, terugzetten, wijziging op schijf):
         // tekst én soort (.md of .mmd) gaan in één call, zodat diagrammen nooit op de verkeerde tekst renderen
         func push(_ text: String) {
             guard loaded, text != lastFromJS else { return }
-            let kind = (parent.fileURL?.pathExtension ?? "").lowercased() == "mmd" ? "mmd" : "md"
-            let name = parent.fileURL?.lastPathComponent ?? ""
+            let kind = (currentURL?.pathExtension ?? "").lowercased() == "mmd" ? "mmd" : "md"
+            let name = currentURL?.lastPathComponent ?? ""
             guard !(text == lastPushed && kind == lastKind && name == lastName) else { return }
             lastPushed = text
             lastKind = kind
@@ -96,6 +110,12 @@ struct EditorView: NSViewRepresentable {
             if message.name == "export" {
                 guard let payload = message.body as? [String: Any],
                       let filename = payload["filename"] as? String else { return }
+                if payload["kind"] as? String == "pdf" {
+                    exportPDF(filename: filename,
+                              width: payload["width"] as? Double ?? 800,
+                              height: payload["height"] as? Double ?? 600)
+                    return
+                }
                 let data: Data
                 if let encoding = payload["encoding"] as? String, encoding == "base64",
                    let encoded = payload["data"] as? String, let decoded = Data(base64Encoded: encoded) {
@@ -113,6 +133,14 @@ struct EditorView: NSViewRepresentable {
                       let id = payload["id"] as? String,
                       let urls = payload["urls"] as? [String] else { return }
                 fetchImages(id: id, urls: urls)
+                return
+            }
+            if message.name == "links" {
+                if let payload = message.body as? [String: Any], let href = payload["href"] as? String {
+                    handleLink(href, newWindow: (payload["mode"] as? String) == "new")
+                } else if let href = message.body as? String {
+                    handleLink(href, newWindow: true)
+                }
                 return
             }
             guard let string = message.body as? String else { return }
@@ -140,6 +168,44 @@ struct EditorView: NSViewRepresentable {
             } else {
                 handle(panel.runModal())
             }
+        }
+
+        // Diagram -> vector-PDF op het formaat van het diagram (via WKWebView.createPDF,
+        // asynchroon, zodat de hoofdthread niet blokkeert)
+        private func exportPDF(filename: String, width: Double, height: Double) {
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = filename
+            panel.canCreateDirectories = true
+            let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+                guard let web = self?.web else { return }
+                guard response == .OK, let url = panel.url else { self?.finishPDF(); return }
+                let config = WKPDFConfiguration()
+                config.rect = CGRect(x: 0, y: 0, width: max(24, width), height: max(24, height))
+                web.createPDF(configuration: config) { [weak self] result in
+                    defer { self?.finishPDF() }
+                    switch result {
+                    case .success(let data):
+                        do {
+                            try data.write(to: url)
+                            self?.notify("Geëxporteerd: " + url.lastPathComponent)
+                        } catch {
+                            self?.notify("PDF opslaan mislukt")
+                        }
+                    case .failure:
+                        self?.notify("PDF maken mislukt")
+                    }
+                }
+            }
+            if let window = web?.window {
+                panel.beginSheetModal(for: window, completionHandler: handle)
+            } else {
+                handle(panel.runModal())
+            }
+        }
+
+        // Editor laten weten dat de PDF-export klaar is (herstelt de normale weergave)
+        private func finishPDF() {
+            web?.callAsyncJavaScript("window.__pdfDone && __pdfDone()", arguments: [:], in: nil, in: .page, completionHandler: nil)
         }
 
         // Afbeeldingen downloaden voor de docx-export (omzeilt CORS)
@@ -172,6 +238,142 @@ struct EditorView: NSViewRepresentable {
             web?.callAsyncJavaScript("__toast(t)", arguments: ["t": text], in: nil, in: .page, completionHandler: nil)
         }
 
+        // Klik op een link: webadressen gaan naar de standaardapp, bestanden worden
+        // geopend ten opzichte van de map van het document — maar alleen als ze bestaan.
+        // Zonder Cmd vervangt een document het huidige document in dit venster.
+        private func handleLink(_ rawHref: String, newWindow: Bool) {
+            let href = rawHref.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !href.isEmpty, !href.hasPrefix("#") else { return }
+            lastOpen = Date()
+
+            if let url = URL(string: href), let scheme = url.scheme?.lowercased(), !scheme.isEmpty {
+                switch scheme {
+                case "http", "https", "mailto":
+                    NSWorkspace.shared.open(url)
+                case "file":
+                    openTarget(url, newWindow: newWindow)
+                default:
+                    if !NSWorkspace.shared.open(url) { notify("Kan deze link niet openen") }
+                }
+                return
+            }
+
+            guard let base = currentURL?.deletingLastPathComponent() else {
+                notify("Sla het document eerst op om relatieve links te openen")
+                return
+            }
+            let path = href.split(separator: "#", maxSplits: 1)[0].split(separator: "?", maxSplits: 1)[0]
+            let decoded = path.removingPercentEncoding ?? String(path)
+            guard !decoded.isEmpty else { return }
+            openTarget(URL(fileURLWithPath: decoded, relativeTo: base), newWindow: newWindow)
+        }
+
+        private func openTarget(_ url: URL, newWindow: Bool) {
+            let target = url.standardizedFileURL
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory) else {
+                notify("Bestand niet gevonden: " + (target.lastPathComponent.isEmpty ? target.path : target.lastPathComponent))
+                return
+            }
+            if !newWindow, !isDirectory.boolValue, canOpenInEditor(target) {
+                swapInThisWindow(target)
+            } else if !NSWorkspace.shared.open(target) {
+                notify("Kan bestand niet openen")
+            }
+        }
+
+        /// Alleen de soorten die deze editor zelf aankan komen in hetzelfde venster.
+        private func canOpenInEditor(_ url: URL) -> Bool {
+            ["md", "markdown", "mmd", "txt"].contains(url.pathExtension.lowercased())
+        }
+
+        /// Vervangt het document in dit venster: eerst het huidige document opslaan
+        /// (of navragen), dan de inhoud van het doel laden en het document daarheen verhuizen.
+        private func swapInThisWindow(_ target: URL) {
+            guard let doc = document,
+                  let text = try? String(contentsOf: target, encoding: .utf8) else {
+                if !NSWorkspace.shared.open(target) { notify("Kan bestand niet openen") }
+                return
+            }
+            confirmChanges(destination: target.lastPathComponent) { [weak self] in
+                guard let self else { return }
+                let type = doc.fileType ?? "net.daringfireball.markdown"
+                self.parent.text = text
+                doc.save(to: target, ofType: type, for: .saveAsOperation) { error in
+                    if let error { self.notify("Wisselen van document mislukt: " + error.localizedDescription) }
+                }
+            }
+        }
+
+        /// Zijn er wijzigingen die nog niet in het bestand staan?
+        private var hasUnsavedChanges: Bool {
+            guard let doc = document else { return false }
+            if doc.isDocumentEdited { return true }
+            guard let url = doc.fileURL,
+                  let onDisk = try? String(contentsOf: url, encoding: .utf8) else { return false }
+            return onDisk != parent.text
+        }
+
+        /// Vraagt om wijzigingen te bewaren voordat er genavigeerd wordt.
+        private func confirmChanges(destination: String, proceed: @escaping () -> Void) {
+            guard hasUnsavedChanges else { proceed(); return }
+            let name = currentURL?.lastPathComponent ?? "Het document"
+            let alert = NSAlert()
+            alert.messageText = "Wijzigingen opslaan?"
+            alert.informativeText = "\(name) is gewijzigd. Als je zonder opslaan naar \(destination) gaat, gaan die wijzigingen verloren."
+            alert.addButton(withTitle: "Opslaan")
+            alert.addButton(withTitle: "Niet opslaan")
+            alert.addButton(withTitle: "Annuleren")
+            let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+                guard let self else { return }
+                switch response {
+                case .alertFirstButtonReturn:
+                    self.saveCurrentDocument { saved in if saved { proceed() } }
+                case .alertSecondButtonReturn:
+                    proceed()
+                default:
+                    break
+                }
+            }
+            if let window = web?.window {
+                alert.beginSheetModal(for: window, completionHandler: handle)
+            } else {
+                handle(alert.runModal())
+            }
+        }
+
+        /// Schrijft het huidige document weg; vraagt eerst om een bestandsnaam als het nog geen bestand is.
+        private func saveCurrentDocument(completion: @escaping (Bool) -> Void) {
+            guard let doc = document else {
+                completion(false)
+                return
+            }
+            let type = doc.fileType ?? "net.daringfireball.markdown"
+            if let url = doc.fileURL {
+                doc.save(to: url, ofType: type, for: .saveOperation) { error in
+                    completion(error == nil)
+                }
+                return
+            }
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = "document.md"
+            panel.canCreateDirectories = true
+            let handle: (NSApplication.ModalResponse) -> Void = { response in
+                guard response == .OK, let url = panel.url else {
+                    completion(false)
+                    return
+                }
+                doc.save(to: url, ofType: type, for: .saveAsOperation) { error in
+                    completion(error == nil)
+                }
+            }
+            if let window = web?.window {
+                panel.beginSheetModal(for: window, completionHandler: handle)
+            } else {
+                handle(panel.runModal())
+            }
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             loaded = true
             push(parent.text)
@@ -179,17 +381,19 @@ struct EditorView: NSViewRepresentable {
         }
 
 
-        // Links openen in de standaardbrowser
+        // Klik op een link: nooit in de webweergave zelf navigeren. De editor stuurt
+        // de ruwe href via de brug; deze route is de vangnet-variant.
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let url = navigationAction.request.url,
-               navigationAction.navigationType == .linkActivated,
-               ["http", "https", "mailto"].contains(url.scheme ?? "") {
-                NSWorkspace.shared.open(url)
-                decisionHandler(.cancel)
+            guard navigationAction.navigationType == .linkActivated,
+                  let url = navigationAction.request.url else {
+                decisionHandler(.allow)
                 return
             }
-            decisionHandler(.allow)
+            decisionHandler(.cancel)
+            if url.scheme == "file" && url.path == webView.url?.path { return }
+            guard Date().timeIntervalSince(lastOpen) > 0.75 else { return }
+            if ["http", "https", "mailto"].contains(url.scheme ?? "") { NSWorkspace.shared.open(url) }
         }
 
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,

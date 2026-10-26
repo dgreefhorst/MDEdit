@@ -73,6 +73,22 @@ footer{display:flex;gap:16px;padding:4px 12px;font-size:12px;color:var(--muted);
 #txtDlg h2{font-size:15px;margin:0}
 #txtDlg textarea{width:100%;min-height:260px;resize:vertical;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px}
 #txtDlg .row{display:flex;gap:8px;justify-content:flex-end}
+#zoomDlg{position:fixed;inset:0;background:rgba(14,16,20,.85);z-index:30;display:flex;flex-direction:column;gap:10px;padding:14px}
+#zoomDlg.hide{display:none}
+#zoomStage{flex:1;min-height:0;display:flex;overflow:auto;background:#fff;border-radius:10px;cursor:grab;touch-action:pan-x pan-y}
+#zoomStage.dragging{cursor:grabbing}
+#zoomPane{margin:auto;flex:none}
+#zoomPane svg{display:block}
+.zoombar{display:flex;gap:6px;align-items:center;padding:6px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+#zoomPct{font-size:12px;color:var(--muted);min-width:46px;text-align:center}
+html.pdfmode body{display:block;background:#fff}
+html.pdfmode header,html.pdfmode .tb,html.pdfmode footer,html.pdfmode #toast{display:none!important}
+html.pdfmode main{display:block}
+html.pdfmode #ps{display:none!important}
+html.pdfmode .pane{overflow:visible;border:0;background:#fff;height:auto}
+html.pdfmode #editor{max-width:none;margin:0;padding:0;min-height:0}
+html.pdfmode #editor>*:not(.mmd){display:none!important}
+html.pdfmode #editor .mmd{margin:0;padding:0;border:0;background:none;overflow:visible;text-align:left}
 </style>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/turndown.js"></script>
@@ -125,6 +141,8 @@ footer{display:flex;gap:16px;padding:4px 12px;font-size:12px;color:var(--muted);
   <span class="sep"></span>
   <button id="bExpHtml" class="ic" title="Exporteren naar HTML"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>HTML</span></button>
   <button id="bExpWord" class="ic" title="Exporteren naar MS Word"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Word</span></button>
+  <button id="bExpPdf" class="ic hide" title="Het diagram als vector-PDF exporteren (kan in Word worden ingevoegd)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>PDF</span></button>
+  <button id="bExpSvg" class="ic hide" title="Het diagram als SVG exporteren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>SVG</span></button>
   <button id="bExpWiki" class="ic" title="Exporteren naar MediaWiki-markup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Wiki</span></button>
 </div>
 <main id="main">
@@ -147,6 +165,18 @@ footer{display:flex;gap:16px;padding:4px 12px;font-size:12px;color:var(--muted);
     <input id="imgFile" type="file" accept="image/*" class="hide">
   </div>
 </div>
+<div id="zoomDlg" class="hide">
+  <div id="zoomStage"><div id="zoomPane"></div></div>
+  <div class="zoombar">
+    <button id="zoomOut" title="Kleiner">−</button>
+    <span id="zoomPct">100%</span>
+    <button id="zoomIn" title="Groter">+</button>
+    <button id="zoomFit" title="Passend maken">Passend</button>
+    <span class="spacer"></span>
+    <button id="zoomEdit" title="Mermaid-bron bewerken">Bron bewerken</button>
+    <button id="zoomClose" class="primary" title="Sluiten (Esc)">Sluiten</button>
+  </div>
+</div>
 <div id="txtDlg" class="hide">
   <div class="dlg">
     <h2 id="txtTitle">Mermaid-bron</h2>
@@ -165,7 +195,7 @@ const hasMermaid=!!window.mermaid;
 let docKind='md';
 marked.setOptions({gfm:true,breaks:false});
 const isDark=()=>{const r=document.documentElement;return r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches};
-const mermaidInit=()=>{if(hasMermaid)mermaid.initialize({startOnLoad:false,securityLevel:'strict',theme:isDark()?'dark':'default'})};
+const mermaidInit=(extra)=>{if(hasMermaid)mermaid.initialize(Object.assign({startOnLoad:false,securityLevel:'strict',theme:isDark()?'dark':'default'},extra||{}))};
 mermaidInit();
 const td=new TurndownService({headingStyle:'atx',codeBlockStyle:'fenced',bulletListMarker:'-',emDelimiter:'*',strongDelimiter:'**',hr:'---'});
 td.addRule('strike',{filter:['del','s','strike'],replacement:c=>'~~'+c+'~~'});
@@ -194,6 +224,7 @@ function clean(html){
 function mmdBlock(source){
   const d=document.createElement('div');
   d.className='mmd';d.setAttribute('contenteditable','false');d.setAttribute('data-src',source||'');
+  d.title='Klik om te vergroten · Option-klik om de bron te bewerken';
   const o=document.createElement('div');o.className='mmd-out';d.appendChild(o);
   return d;
 }
@@ -272,6 +303,13 @@ function setMode(m){
 $('#modes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m)});
 
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800)}
+// Links gaan naar de app: webadressen naar de browser, bestanden naar de standaardapp
+// (alleen als het bestand bestaat). window.open is in een WKWebView geblokkeerd.
+function openHref(href,mode){
+  if(!href)return;
+  if(window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.links){webkit.messageHandlers.links.postMessage({href:href,mode:mode||'same'});return}
+  try{window.open(href,'_blank','noopener')}catch(e){}
+}
 function exec(c,v){ed.focus();document.execCommand(c,false,v);fromEditor();sync()}
 function selHTML(){const s=getSelection();if(!s.rangeCount)return '';const d=document.createElement('div');d.appendChild(s.getRangeAt(0).cloneContents());return d.innerHTML}
 function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
@@ -359,6 +397,73 @@ async function editDiagram(blk){
   mmdRenderInto(blk);fromEditor();
 }
 
+// Diagram vergroten (klik op het diagram); Option-klik bewerkt de bron
+const zoomDlg=$('#zoomDlg'),zoomStage=$('#zoomStage'),zoomPane=$('#zoomPane');
+const zoomState={block:null,scale:1,w:0,h:0};
+function zoomSet(s){
+  zoomState.scale=Math.min(8,Math.max(0.05,s));
+  const el=zoomPane.querySelector('svg');
+  if(el){el.setAttribute('width',zoomState.w*zoomState.scale);el.setAttribute('height',zoomState.h*zoomState.scale)}
+  $('#zoomPct').textContent=Math.round(zoomState.scale*100)+'%';
+}
+function zoomFit(){
+  const r=zoomStage.getBoundingClientRect();
+  const s=Math.min((r.width-24)/zoomState.w,(r.height-24)/zoomState.h);
+  zoomSet(Math.min(1.5,s));
+  zoomStage.scrollLeft=0;zoomStage.scrollTop=0;
+}
+async function openZoom(blk){
+  const source=blk.getAttribute('data-src')||'';
+  if(!source.trim()||!hasMermaid){editDiagram(blk);return}
+  const r0=blk.getBoundingClientRect();
+  zoomState.block=blk;
+  let svg='';
+  mermaidInit({htmlLabels:false,theme:'default'});
+  try{svg=(await mermaid.render('zoom-'+(++mmdSeq),source)).svg}catch(e){svg=''}finally{mermaidInit()}
+  if(!svg){editDiagram(blk);return}
+  const vb=/viewBox="([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+)"/.exec(svg);
+  zoomState.w=vb?parseFloat(vb[3]):Math.max(1,Math.round(r0.width));
+  zoomState.h=vb?parseFloat(vb[4]):Math.max(1,Math.round(r0.height));
+  zoomPane.innerHTML=svg;
+  const el=zoomPane.querySelector('svg');
+  if(el){el.removeAttribute('style');el.setAttribute('width',zoomState.w);el.setAttribute('height',zoomState.h)}
+  zoomDlg.classList.remove('hide');
+  zoomFit();
+}
+function closeZoom(){zoomDlg.classList.add('hide');zoomPane.innerHTML='';zoomState.block=null}
+$('#zoomIn').onclick=()=>zoomSet(zoomState.scale*1.25);
+$('#zoomOut').onclick=()=>zoomSet(zoomState.scale/1.25);
+$('#zoomFit').onclick=zoomFit;
+$('#zoomClose').onclick=closeZoom;
+$('#zoomEdit').onclick=()=>{const b=zoomState.block;closeZoom();if(b)editDiagram(b)};
+zoomDlg.addEventListener('mousedown',e=>{if(e.target===zoomDlg)closeZoom()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!zoomDlg.classList.contains('hide'))closeZoom()});
+zoomStage.addEventListener('wheel',e=>{                       // knijpen of Cmd/Ctrl+scrollen zoomt
+  if(!(e.ctrlKey||e.metaKey))return;
+  e.preventDefault();
+  const r=zoomStage.getBoundingClientRect();
+  const cx=e.clientX-r.left+zoomStage.scrollLeft,cy=e.clientY-r.top+zoomStage.scrollTop,hup=e.deltaY<0;
+  const before=zoomState.scale;
+  zoomSet(hup?before*1.15:before/1.15);
+  const k=zoomState.scale/before;
+  zoomStage.scrollLeft=cx*k-(e.clientX-r.left);
+  zoomStage.scrollTop=cy*k-(e.clientY-r.top);
+},{passive:false});
+let zoomDrag=null;
+zoomStage.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;
+  zoomDrag={x:e.clientX,y:e.clientY,l:zoomStage.scrollLeft,t:zoomStage.scrollTop};
+  zoomStage.classList.add('dragging');zoomStage.setPointerCapture(e.pointerId);
+});
+zoomStage.addEventListener('pointermove',e=>{
+  if(!zoomDrag)return;
+  zoomStage.scrollLeft=zoomDrag.l-(e.clientX-zoomDrag.x);
+  zoomStage.scrollTop=zoomDrag.t-(e.clientY-zoomDrag.y);
+});
+const zoomDrop=()=>{zoomDrag=null;zoomStage.classList.remove('dragging')};
+zoomStage.addEventListener('pointerup',zoomDrop);
+zoomStage.addEventListener('pointercancel',zoomDrop);
+
 function currentBlock(){
   const s=getSelection();if(!s.anchorNode||!ed.contains(s.anchorNode))return 'p';
   let n=s.anchorNode.nodeType===3?s.anchorNode.parentElement:s.anchorNode;
@@ -400,9 +505,10 @@ ed.addEventListener('paste',e=>{
 });
 ed.addEventListener('click',e=>{
   const mmd=e.target.closest('.mmd');
-  if(mmd){editDiagram(mmd);return}
+  if(mmd){if(e.altKey||e.metaKey)editDiagram(mmd);else openZoom(mmd);return}
   if(e.target.matches('input[type=checkbox]')){if(e.target.checked)e.target.setAttribute('checked','');else e.target.removeAttribute('checked');fromEditor()}
-  const a=e.target.closest('a');if(a&&(e.ctrlKey||e.metaKey)){window.open(a.href,'_blank','noopener')}
+  const a=e.target.closest('a[href]');
+  if(a&&!e.shiftKey&&!e.altKey){e.preventDefault();openHref(a.getAttribute('href'),(e.metaKey||e.ctrlKey)?'new':'same')}
 });
 
 // Bestanden
@@ -410,7 +516,9 @@ let fname='document.md';
 const fsa='showOpenFilePicker' in window;
 const ftypes=[{description:'Markdown & Mermaid',accept:{'text/markdown':['.md','.markdown'],'text/plain':['.txt','.mmd']}}];
 let handle=null,dirty=false;
-function label(){$('#fn').textContent=(handle?'🔗 ':'')+fname+(dirty?' •':'');$('#autoWrap').classList.toggle('hide',!handle)}
+function label(){$('#fn').textContent=(handle?'🔗 ':'')+fname+(dirty?' •':'');$('#autoWrap').classList.toggle('hide',!handle);
+  // SVG en PDF horen bij één diagram, dus alleen bij een los .mmd-bestand
+  $('#bExpSvg').classList.toggle('hide',docKind!=='mmd');$('#bExpPdf').classList.toggle('hide',docKind!=='mmd')}
 async function openPicker(){
   try{
     const [h]=await showOpenFilePicker({types:ftypes,multiple:false});
@@ -611,7 +719,7 @@ async function svgToPngBytes(svg){
   const vb=/viewBox="([^"]+)"/.exec(svg);
   if(vb){const p=vb[1].trim().split(/[\s,]+/).map(Number);if(p.length===4&&p[2]>0&&p[3]>0){w=p[2];h=p[3]}}
   else{const wh=/<svg[^>]*\swidth="([\d.]+)"[^>]*\sheight="([\d.]+)"/.exec(svg);if(wh){w=+wh[1];h=+wh[2]}}
-  let scale=2;while((w*scale>4000||h*scale>4000)&&scale>1)scale-=0.5;
+  let scale=3;while((w*scale>4000||h*scale>4000)&&scale>1)scale-=0.5;
   const cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
   const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('svg laden mislukt'));i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)});
   const c=document.createElement('canvas');c.width=cw;c.height=ch;
@@ -644,7 +752,7 @@ async function docxBytes(md){
       if(r&&r.ok&&r.data){const b=b64Bytes(r.data);const ext=extFromBytes(b)||extFromMime(r.mime||'')||extFromUrl(p[1]);if(ext)picMap.set(p[0],{bytes:b,ext:ext})}
     });
   }
-  const EMU=9525,MAXW=6120130,picInfo=new Map(),diagInfo=new Map();
+  const EMU=9525,MAXW=6120130,picInfo=new Map();
   for(const [img,got] of [...picMap]){
     const name='image'+(++imgN)+'.'+got.ext,id='rId'+(hid++);
     media.push({name:'word/media/'+name,data:got.bytes});exts.add(got.ext);
@@ -652,44 +760,31 @@ async function docxBytes(md){
     const d=await imageDims(got.bytes),sc=d.w*EMU>MAXW?MAXW/(d.w*EMU):1;
     picInfo.set(img,{id:id,cx:Math.max(1,Math.round(d.w*EMU*sc)),cy:Math.max(1,Math.round(d.h*EMU*sc))});
   }
-  // Mermaid-diagrammen als vector (SVG) met een PNG-fallback voor oudere Word-versies
+  // Mermaid-diagrammen als afbeelding in de docx. Word's eigen SVG-engine geeft
+  // mermaid's uitvoer niet goed weer (ook niet bij handmatig invoegen), dus rasteren
+  // we het diagram en zetten we die afbeelding in het document.
+  mermaidInit({htmlLabels:false});
   for(const dg of [...tpl.content.querySelectorAll('.mmd')]){
     const diagramSrc=dg.getAttribute('data-src')||'';
     if(!diagramSrc.trim())continue;
     let svg;try{svg=(await mermaid.render('mmdx-'+(++mmdSeq),diagramSrc)).svg}catch(e){continue}
-    const svgName='image'+(++imgN)+'.svg',svgId='rId'+(hid++);
-    media.push({name:'word/media/'+svgName,data:new TextEncoder().encode(svg)});exts.add('svg');
-    hyper.push('<Relationship Id="'+svgId+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+svgName+'"/>');
     let png=null;try{png=await svgToPngBytes(svg)}catch(e){}
     if(!png)continue;
-    const pngName='image'+(++imgN)+'.png',pngId='rId'+(hid++);
-    media.push({name:'word/media/'+pngName,data:png.bytes});exts.add('png');
-    hyper.push('<Relationship Id="'+pngId+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+pngName+'"/>');
+    const name='image'+(++imgN)+'.png',id='rId'+(hid++);
+    media.push({name:'word/media/'+name,data:png.bytes});exts.add('png');
+    hyper.push('<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+name+'"/>');
     const sc=png.cx*EMU>MAXW?MAXW/(png.cx*EMU):1;
-    diagInfo.set(dg,{pngId:pngId,svgId:svgId,cx:Math.max(1,Math.round(png.cx*EMU*sc)),cy:Math.max(1,Math.round(png.cy*EMU*sc))});
+    picInfo.set(dg,{id:id,cx:Math.max(1,Math.round(png.cx*EMU*sc)),cy:Math.max(1,Math.round(png.cy*EMU*sc))});
   }
-  function drawDiagram(n){
-    const m=diagInfo.get(n);if(!m)return '';
-    const dn=++docPrN;
-    return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
-      +'<wp:extent cx="'+m.cx+'" cy="'+m.cy+'"/><wp:effectExtent l="0" t="0" r="0" b="0"/>'
-      +'<wp:docPr id="'+dn+'" name="Diagram '+dn+'"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>'
-      +'<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>'
-      +'<pic:nvPicPr><pic:cNvPr id="'+dn+'" name="Diagram '+dn+'"/><pic:cNvPicPr/></pic:nvPicPr>'
-      +'<pic:blipFill><a:blip r:embed="'+m.pngId+'"><a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}">'
-      +'<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="'+m.svgId+'"/>'
-      +'</a:ext></a:extLst></a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
-      +'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+m.cx+'" cy="'+m.cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
-      +'</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
-  }
-  function draw(img){
+  mermaidInit();
+  function draw(img,label){
     const m=picInfo.get(img);if(!m)return '';
-    const dn=++docPrN;
+    const dn=++docPrN,name=(label||'Afbeelding')+' '+dn;
     return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
       +'<wp:extent cx="'+m.cx+'" cy="'+m.cy+'"/><wp:effectExtent l="0" t="0" r="0" b="0"/>'
-      +'<wp:docPr id="'+dn+'" name="Afbeelding '+dn+'"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>'
+      +'<wp:docPr id="'+dn+'" name="'+name+'"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>'
       +'<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>'
-      +'<pic:nvPicPr><pic:cNvPr id="'+dn+'" name="Afbeelding '+dn+'"/><pic:cNvPicPr/></pic:nvPicPr>'
+      +'<pic:nvPicPr><pic:cNvPr id="'+dn+'" name="'+name+'"/><pic:cNvPicPr/></pic:nvPicPr>'
       +'<pic:blipFill><a:blip r:embed="'+m.id+'"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
       +'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+m.cx+'" cy="'+m.cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
       +'</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
@@ -776,7 +871,7 @@ async function docxBytes(md){
       if(n.nodeType!==1)return;
       const tag=n.tagName.toLowerCase();
       if(/^h[1-4]$/.test(tag)){out+=para('<w:pStyle w:val="Heading'+tag[1]+'"/>',runs(n,{}));return}
-      if(tag==='div'&&n.classList&&n.classList.contains('mmd')){out+=para('',drawDiagram(n));return}
+      if(tag==='div'&&n.classList&&n.classList.contains('mmd')){out+=para('',draw(n,'Diagram'));return}
       switch(tag){
         case 'p':out+=para('',runs(n,{}));break;
         case 'blockquote':out+=quote(n);break;
@@ -870,13 +965,73 @@ async function htmlWithDiagrams(md){
   }
   return docHTML(docName('')||'document',tpl.innerHTML);
 }
+// SVG-export (alleen voor een los .mmd-bestand): het diagram zelf als vector-SVG
+function cleanDiagramSvg(svg){
+  // drop-shadow-filters worden door veel tekenprogramma's niet ondersteund; laat ze weg
+  return svg.replace(/filter:\s*drop-shadow\([^()]*(?:\([^()]*\)[^()]*)*\)\s*;?/g,'')
+            .replace(/<defs>\s*<filter\b[^>]*>[\s\S]*?<\/filter>\s*<\/defs>/g,'');
+}
+async function diagramSvg(source){
+  if(!source.trim()||!hasMermaid)return '';
+  let svg='';
+  mermaidInit({htmlLabels:false,theme:'default'});
+  try{svg=(await mermaid.render('svgexp-'+(++mmdSeq),source)).svg}catch(e){svg=''}finally{mermaidInit()}
+  if(!svg)return '';
+  const vb=/viewBox="([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+)"/.exec(svg);
+  svg=cleanDiagramSvg(svg);
+  // los bestand: expliciete breedte/hoogte in plaats van width="100%"
+  if(vb)svg=svg.replace(/<svg([^>]*?)\swidth="100%"/,'<svg$1 width="'+vb[3]+'" height="'+vb[4]+'"')
+              .replace(/(<svg[^>]*?)\sstyle="max-width:[^"]*"/,'$1');
+  return svg;
+}
+// PDF-export (alleen voor een los .mmd-bestand): het diagram als vector-PDF op het
+// formaat van het diagram, om in te voegen in programma's die de SVG niet aankunnen.
+// Het diagram wordt voor de PDF met echte SVG-tekst en zonder filters getekend en
+// linksboven op maat gezet (klasse pdfmode), zodat de PDF uit vectoren en tekst bestaat.
+async function exportDiagramPdf(){
+  const block=ed.querySelector('.mmd');
+  if(!block){toast('Geen diagram om te exporteren');return}
+  if(!(bridgeReady&&window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.export)){toast('PDF-export werkt alleen in de app');return}
+  if(mode==='source')setMode('wysiwyg');
+  const out=block.querySelector('.mmd-out')||block,source=block.getAttribute('data-src')||'';
+  let svg='';
+  mermaidInit({htmlLabels:false,theme:'default'});
+  try{svg=(await mermaid.render('pdfexp-'+(++mmdSeq),source)).svg}catch(e){svg=''}finally{mermaidInit()}
+  const vb=svg&&/viewBox="([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+)"/.exec(svg);
+  const w=vb?parseFloat(vb[3]):0,h=vb?parseFloat(vb[4]):0;
+  if(!svg||!(w>0)||!(h>0)){toast('Geen diagram om te exporteren');return}
+  lock=true;out.innerHTML=cleanDiagramSvg(svg);mo.takeRecords();lock=false;
+  block.setAttribute('data-rendered','1');
+  const el=out.querySelector('svg');
+  if(el){el.setAttribute('width',w);el.setAttribute('height',h);el.style.maxWidth='none'}
+  document.documentElement.classList.add('pdfmode');
+  window.__pdfDone=()=>{
+    window.__pdfDone=null;
+    document.documentElement.classList.remove('pdfmode');
+    lock=true;block.removeAttribute('data-rendered');mo.takeRecords();lock=false;
+    mmdRenderInto(block);
+  };
+  webkit.messageHandlers.export.postMessage({kind:'pdf',filename:docName('.pdf'),width:w,height:h});
+}
 async function exportDoc(kind){
   if(kind==='word')deliverFile(docName('.docx'),'application/vnd.openxmlformats-officedocument.wordprocessingml.document',await docxBytes(src.value),true);
+  else if(kind==='svg'){
+    if(docKind!=='mmd'){toast('SVG-export is alleen voor een los .mmd-bestand');return}
+    const svg=await diagramSvg(src.value);
+    if(!svg){toast('Geen diagram om te exporteren');return}
+    deliverFile(docName('.svg'),'image/svg+xml',svg);
+  }
+  else if(kind==='pdf'){
+    if(docKind!=='mmd'){toast('PDF-export is alleen voor een los .mmd-bestand');return}
+    await exportDiagramPdf();
+  }
   else if(kind==='wiki')deliverFile(docName('.mediawiki'),'text/plain',toWiki(src.value));
   else deliverFile(docName('.html'),'text/html',await htmlWithDiagrams(src.value));
 }
 $('#bExpHtml').onclick=()=>exportDoc('html');
 $('#bExpWord').onclick=()=>{toast('Word-bestand maken…');exportDoc('word')};
+$('#bExpSvg').onclick=()=>{toast('SVG-bestand maken…');exportDoc('svg')};
+$('#bExpPdf').onclick=()=>{toast('PDF maken…');exportDoc('pdf')};
 $('#bExpWiki').onclick=()=>{toast('MediaWiki-markup maken…');exportDoc('wiki')};
 
 
@@ -900,7 +1055,7 @@ Schrijf **vet**, *cursief* of ~~doorgehaald~~ in de editor, of wissel naar de *M
 
 - Typ \`# \` voor een kop, \`- \` voor een lijst, \`1. \` voor een genummerde lijst
 - Typ \`> \` voor een citaat, \`---\` voor een lijn
-- Ctrl+K voor een link, Ctrl+S om op te slaan
+- Ctrl+K voor een link, Ctrl+S om op te slaan; Cmd-klik opent een link
 
 - [x] Editor gebouwd
 - [ ] Eigen document schrijven
@@ -911,7 +1066,7 @@ Schrijf **vet**, *cursief* of ~~doorgehaald~~ in de editor, of wissel naar de *M
 
 ## Diagrammen
 
-Een \`\`\`mermaid-blok wordt meteen als diagram getekend. Klik op het diagram om de bron aan te passen, of open een los \`.mmd\`-bestand.
+Een \`\`\`mermaid-blok wordt meteen als diagram getekend. Klik op het diagram om het te vergroten of te verschuiven; Option-klik (of de knop *Bron bewerken* in die weergave) past de Mermaid-bron aan. Een los \`.mmd\`-bestand opent direct als diagram.
 
 \`\`\`mermaid
 flowchart LR
@@ -924,7 +1079,7 @@ flowchart LR
 `;
 let init=demo;try{init=localStorage.getItem('md-editor-doc')||demo}catch(e){}
 setMD(init);dirty=false;label();
-if(innerWidth>900)setMode('split');
+setMode('wysiwyg');
 document.documentElement.classList.add('app');
 // Swift -> editor: naam, tekst én soort (.md/.mmd) in één keer, zodat een diagram nooit op de verkeerde tekst rendert
 window.nativeSetDoc=function(ext,name,md){
