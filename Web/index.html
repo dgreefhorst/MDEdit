@@ -19,6 +19,8 @@ header h1{font-size:15px;margin:0 8px 0 0;font-weight:650}
 button,select{font:inherit;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;min-height:30px}
 button:hover{background:var(--accent-soft)}
 button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.35;cursor:default}
+button:disabled:hover{background:transparent}
 button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .sep{width:1px;height:20px;background:var(--line);margin:0 4px}
 .spacer{flex:1}
@@ -89,6 +91,30 @@ html.pdfmode .pane{overflow:visible;border:0;background:#fff;height:auto}
 html.pdfmode #editor{max-width:none;margin:0;padding:0;min-height:0}
 html.pdfmode #editor>*:not(.mmd){display:none!important}
 html.pdfmode #editor .mmd{margin:0;padding:0;border:0;background:none;overflow:visible;text-align:left}
+#find{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+#find.hide{display:none}
+#find input{flex:0 1 260px;min-width:120px;padding:5px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
+#find input:focus{border-color:var(--accent)}
+#findCount{font-size:12px;color:var(--muted);min-width:76px}
+#find button{padding:4px 8px;min-height:26px;line-height:1}
+::highlight(md-find){background:#ffe08a;color:#1f2328}
+::highlight(md-find-current){background:#ffb020;color:#1f2328}
+html.docpdf{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+html.docpdf body{display:block;height:auto;width:642px;background:#fff;color:#1f2328}
+html.docpdf header,html.docpdf .tb,html.docpdf footer,html.docpdf #toast,html.docpdf #find{display:none!important}
+html.docpdf main{display:block}
+html.docpdf #ps{display:none!important}
+html.docpdf .pane{overflow:visible;border:0;background:#fff;height:auto}
+html.docpdf #editor{width:642px;max-width:none;margin:0;padding:0;min-height:0;font-size:11pt}
+html.docpdf #editor code,html.docpdf #editor pre{background:#f0eee8;color:#1f2328}
+html.docpdf #editor th{background:#f0eee8}
+html.docpdf #editor blockquote{color:#555}
+html.docpdf #editor a{color:#1d5fd0}
+html.docpdf #editor table th,html.docpdf #editor table td{border-color:#dcdad2}
+html.docpdf #editor hr{border-color:#dcdad2}
+html.docpdf #editor .mmd{margin:0;padding:0;border:0;background:none;overflow:visible}
+html.docpdf #editor h1,html.docpdf #editor h2,html.docpdf #editor h3,html.docpdf #editor h4{break-after:avoid;page-break-after:avoid}
+html.docpdf #editor pre,html.docpdf #editor blockquote,html.docpdf #editor table,html.docpdf #editor img,html.docpdf #editor .mmd{break-inside:avoid;page-break-inside:avoid}
 </style>
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/turndown.js"></script>
@@ -141,9 +167,16 @@ html.pdfmode #editor .mmd{margin:0;padding:0;border:0;background:none;overflow:v
   <span class="sep"></span>
   <button id="bExpHtml" class="ic" title="Exporteren naar HTML"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>HTML</span></button>
   <button id="bExpWord" class="ic" title="Exporteren naar MS Word"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Word</span></button>
-  <button id="bExpPdf" class="ic hide" title="Het diagram als vector-PDF exporteren (kan in Word worden ingevoegd)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>PDF</span></button>
+  <button id="bExpPdf" class="ic" title="Het document als PDF exporteren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>PDF</span></button>
   <button id="bExpSvg" class="ic hide" title="Het diagram als SVG exporteren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>SVG</span></button>
   <button id="bExpWiki" class="ic" title="Exporteren naar MediaWiki-markup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Wiki</span></button>
+</div>
+<div id="find" class="hide">
+  <input id="findInput" type="search" placeholder="Zoeken in document…" spellcheck="false" autocomplete="off">
+  <span id="findCount"></span>
+  <button id="findPrev" title="Vorige treffer (⇧⌘G)">↑</button>
+  <button id="findNext" title="Volgende treffer (⌘G)">↓</button>
+  <button id="findClose" title="Sluiten (Esc)">✕</button>
 </div>
 <main id="main">
   <div class="pane" id="pe"><div id="editor" contenteditable="true" spellcheck="true"></div></div>
@@ -255,6 +288,7 @@ function fromEditor(){
     const st=src.scrollTop,a=src.selectionStart,b=src.selectionEnd,f=document.activeElement===src;
     src.value=md;src.scrollTop=st;
     if(f)src.setSelectionRange(Math.min(a,md.length),Math.min(b,md.length));
+    histTouch(md);
   }
   lock=false;stats();persist();
 }
@@ -276,8 +310,52 @@ async function mmdRenderInto(b){
   lock=true;b.setAttribute('data-rendered','1');out.innerHTML=html;mo.takeRecords();lock=false;
 }
 function renderMermaid(){ed.querySelectorAll('.mmd').forEach(b=>{if(b.getAttribute('data-rendered')!=='1')mmdRenderInto(b)})}
-function fromSource(){renderEditor(src.value);stats();persist()}
-function setMD(md){src.value=md;renderEditor(md);stats();persist()}
+function fromSource(){histTouch(src.value);renderEditor(src.value);stats();persist()}
+function applyMD(md){src.value=md;renderEditor(md);stats();persist()}
+function setMD(md){applyMD(md);histReset(md)}
+
+// Ongedaan maken / opnieuw: eigen geschiedenis op de Markdown-bron. De native
+// undo van de webweergave is hier niet bruikbaar, omdat de editor de DOM bij elke
+// wijziging opnieuw opbouwt en daarmee de undo-stack wist.
+const HIST_MAX=200,HIST_GROUP=700;
+let histStack=[],histFuture=[],histTime=0;
+const histButtons=()=>[$('[data-c="undo"]'),$('[data-c="redo"]')];
+function updateHistButtons(){
+  const [u,r]=histButtons();
+  if(u)u.disabled=histStack.length<2;
+  if(r)r.disabled=!histFuture.length;
+}
+function histReset(md){
+  histStack=[md==null?'':md];histFuture=[];histTime=0;updateHistButtons();
+}
+// Kleine opeenvolgende wijzigingen (typen) bundelen tot één stap
+function histTouch(md){
+  const last=histStack[histStack.length-1];
+  if(md===last)return;
+  const now=Date.now(),small=Math.abs(md.length-(last==null?0:last.length))<=3;
+  if(now-histTime<HIST_GROUP&&small&&histStack.length>1&&!histFuture.length)histStack[histStack.length-1]=md;
+  else histStack.push(md);
+  if(histStack.length>HIST_MAX)histStack.shift();
+  histFuture.length=0;histTime=now;updateHistButtons();
+}
+function histRestore(){
+  const md=histStack[histStack.length-1];
+  histTime=0;
+  lock=true;applyMD(md);mo.takeRecords();lock=false;
+  if(mode==='source')src.focus();else ed.focus();
+  persist();
+}
+function histUndoStep(){
+  if(histStack.length<2)return;
+  histFuture.push(histStack.pop());
+  histRestore();updateHistButtons();
+}
+function histRedoStep(){
+  if(!histFuture.length)return;
+  histStack.push(histFuture.pop());
+  histRestore();updateHistButtons();
+}
+window.mdUndo=action=>{action==='redo'?histRedoStep():histUndoStep()};
 src.addEventListener('input',fromSource);
 // Scroll synchroon houden in gesplitste weergave
 function link(a,b){
@@ -318,6 +396,8 @@ function insertHTML(h){exec('insertHTML',h)}
 function action(c){
   ed.focus();
   switch(c){
+    case 'undo':histUndoStep();return;
+    case 'redo':histRedoStep();return;
     case 'code':{const s=getSelection().toString();
       const p=getSelection().anchorNode&&getSelection().anchorNode.parentElement;
       if(p&&p.closest('code')&&!p.closest('pre')){const cd=p.closest('code');cd.replaceWith(document.createTextNode(cd.textContent));fromEditor();}
@@ -517,8 +597,9 @@ const fsa='showOpenFilePicker' in window;
 const ftypes=[{description:'Markdown & Mermaid',accept:{'text/markdown':['.md','.markdown'],'text/plain':['.txt','.mmd']}}];
 let handle=null,dirty=false;
 function label(){$('#fn').textContent=(handle?'🔗 ':'')+fname+(dirty?' •':'');$('#autoWrap').classList.toggle('hide',!handle);
-  // SVG en PDF horen bij één diagram, dus alleen bij een los .mmd-bestand
-  $('#bExpSvg').classList.toggle('hide',docKind!=='mmd');$('#bExpPdf').classList.toggle('hide',docKind!=='mmd')}
+  // SVG hoort bij één diagram (alleen een los .mmd-bestand); PDF is er voor beide soorten
+  $('#bExpSvg').classList.toggle('hide',docKind!=='mmd');$('#bExpPdf').classList.remove('hide');
+  $('#bExpPdf').title=docKind==='mmd'?'Het diagram als vector-PDF exporteren (kan in Word worden ingevoegd)':'Het document als PDF exporteren'}
 async function openPicker(){
   try{
     const [h]=await showOpenFilePicker({types:ftypes,multiple:false});
@@ -1013,6 +1094,64 @@ async function exportDiagramPdf(){
   };
   webkit.messageHandlers.export.postMessage({kind:'pdf',filename:docName('.pdf'),width:w,height:h});
 }
+// Diagrammen opnieuw tekenen (na een themawissel die alleen voor de PDF bedoeld is)
+async function reRenderDiagrams(){
+  if(!hasMermaid)return;
+  mermaidInit();
+  const blocks=[...ed.querySelectorAll('.mmd')];
+  lock=true;blocks.forEach(b=>b.removeAttribute('data-rendered'));mo.takeRecords();lock=false;
+  await Promise.all(blocks.map(b=>mmdRenderInto(b)));
+}
+// Paginering voor de PDF: breekpunten (in css-px, vanaf de bovenkant van de inhoud)
+// op blokgrenzen, zodat een alinea of kop niet halverwege een pagina wordt afgeknipt.
+// De maten komen overeen met de A4-pagina en marge in EditorView.exportDocumentPDF.
+const PDF_MARGIN=56,PDF_PAGE_W=595.28,PDF_PAGE_H=841.89;
+function pdfPageBreaks(width,height){
+  const scale=Math.min((PDF_PAGE_W-2*PDF_MARGIN)/width,72/96);
+  const pagePx=(PDF_PAGE_H-2*PDF_MARGIN)/scale;
+  const base=ed.getBoundingClientRect().top;
+  const breaks=[0];
+  let pageStart=0;
+  ed.querySelectorAll(':scope > *').forEach(el=>{
+    const r=el.getBoundingClientRect();
+    if(!r.height)return;
+    const top=Math.max(0,r.top-base),bottom=Math.max(0,r.bottom-base);
+    if(bottom-pageStart<=pagePx)return;
+    if(top>pageStart+pagePx*0.25){breaks.push(top);pageStart=top}
+    // Blok hoger dan een pagina (bijv. een lange tabel of codeblok): toch opsplitsen
+    while(bottom-pageStart>pagePx){pageStart+=pagePx;breaks.push(pageStart)}
+  });
+  if(breaks[breaks.length-1]<height-0.5)breaks.push(height);else breaks[breaks.length-1]=height;
+  return breaks;
+}
+// PDF-export van het hele document: de app maakt eerst één PDF van de volledige
+// inhoud en knipt die in A4-pagina's op de hier berekende breekpunten.
+async function exportDocumentPdf(){
+  if(!(bridgeReady&&window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.export)){toast('PDF-export werkt alleen in de app');return}
+  const prevMode=mode;
+  if(mode==='source')setMode('wysiwyg');
+  const prevTheme=document.documentElement.dataset.theme;
+  const lighten=isDark();
+  if(lighten){document.documentElement.dataset.theme='light';await reRenderDiagrams()}
+  document.documentElement.classList.add('docpdf');
+  // Zoekmarkeringen horen niet in de PDF; na afloop zetten we ze terug
+  const hadFind=!findBar.classList.contains('hide')&&!!findInput.value;
+  if(hadFind)findClear();
+  const width=Math.ceil(ed.scrollWidth);
+  const height=Math.ceil(Math.max(document.documentElement.scrollHeight,ed.getBoundingClientRect().height));
+  const breaks=pdfPageBreaks(width,height);
+  window.__pdfDone=()=>{
+    window.__pdfDone=null;
+    document.documentElement.classList.remove('docpdf');
+    if(lighten){
+      if(prevTheme)document.documentElement.dataset.theme=prevTheme;else delete document.documentElement.dataset.theme;
+      reRenderDiagrams();
+    }
+    if(prevMode==='source')setMode('source');
+    if(hadFind)findRun();
+  };
+  webkit.messageHandlers.export.postMessage({kind:'docpdf',filename:docName('.pdf'),width:width,height:height,breaks:breaks});
+}
 async function exportDoc(kind){
   if(kind==='word')deliverFile(docName('.docx'),'application/vnd.openxmlformats-officedocument.wordprocessingml.document',await docxBytes(src.value),true);
   else if(kind==='svg'){
@@ -1022,8 +1161,8 @@ async function exportDoc(kind){
     deliverFile(docName('.svg'),'image/svg+xml',svg);
   }
   else if(kind==='pdf'){
-    if(docKind!=='mmd'){toast('PDF-export is alleen voor een los .mmd-bestand');return}
-    await exportDiagramPdf();
+    if(docKind==='mmd')await exportDiagramPdf();
+    else await exportDocumentPdf();
   }
   else if(kind==='wiki')deliverFile(docName('.mediawiki'),'text/plain',toWiki(src.value));
   else deliverFile(docName('.html'),'text/html',await htmlWithDiagrams(src.value));
@@ -1034,6 +1173,152 @@ $('#bExpSvg').onclick=()=>{toast('SVG-bestand maken…');exportDoc('svg')};
 $('#bExpPdf').onclick=()=>{toast('PDF maken…');exportDoc('pdf')};
 $('#bExpWiki').onclick=()=>{toast('MediaWiki-markup maken…');exportDoc('wiki')};
 
+
+// Zoeken in het document (Cmd+F): markeert alle treffers en springt naar de huidige.
+// De editor-DOM wordt niet aangepast (anders zou de MutationObserver het document
+// als bewerkt zien); markeren gebeurt met de CSS Custom Highlight API.
+const findBar=$('#find'),findInput=$('#findInput'),findCount=$('#findCount');
+const canHighlight=!!(window.CSS&&CSS.highlights&&window.Highlight);
+let findRanges=[],findCur=-1;
+function findClear(){
+  findRanges=[];findCur=-1;
+  if(canHighlight){CSS.highlights.delete('md-find');CSS.highlights.delete('md-find-current')}
+}
+function findTextNodes(){
+  const out=[],w=document.createTreeWalker(ed,NodeFilter.SHOW_TEXT,{acceptNode(n){
+    if(!n.nodeValue)return NodeFilter.FILTER_REJECT;
+    if(n.parentElement&&n.parentElement.closest('.mmd'))return NodeFilter.FILTER_REJECT;
+    return NodeFilter.FILTER_ACCEPT}});
+  let n;while((n=w.nextNode()))out.push(n);
+  return out;
+}
+function findPos(nodes,spans,off,isEnd){
+  for(let k=0;k<nodes.length;k++){
+    const s=spans[k][0],e=spans[k][1];
+    if(off>=s&&off<=e){
+      if(off===e&&!isEnd&&k+1<nodes.length)continue;
+      if(off===s&&isEnd&&k>0)continue;
+      return {node:nodes[k],offset:off-s};
+    }
+  }
+  const k=nodes.length-1;
+  return k<0?null:{node:nodes[k],offset:Math.max(0,off-spans[k][0])};
+}
+function findInEditor(q){
+  const nodes=findTextNodes(),out=[];
+  let text='';
+  const spans=nodes.map(n=>{const s=text.length;text+=n.nodeValue;return [s,text.length]});
+  const hay=text.toLowerCase(),needle=q.toLowerCase();
+  if(!needle)return out;
+  let i=0;
+  while((i=hay.indexOf(needle,i))!==-1){
+    const a=findPos(nodes,spans,i,false),b=findPos(nodes,spans,i+needle.length,true);
+    if(a&&b){
+      const r=document.createRange();
+      try{r.setStart(a.node,a.offset);r.setEnd(b.node,b.offset);out.push(r)}catch(e){}
+    }
+    i+=Math.max(1,needle.length);
+  }
+  return out;
+}
+function findInSource(q){
+  const out=[],hay=src.value.toLowerCase(),needle=q.toLowerCase();
+  if(!needle)return out;
+  let i=0;
+  while((i=hay.indexOf(needle,i))!==-1){out.push({start:i,end:i+needle.length});i+=Math.max(1,needle.length)}
+  return out;
+}
+function findCollect(){
+  const q=findInput.value;
+  if(!q){findClear();findCount.textContent='';return 0}
+  findRanges=mode==='source'?findInSource(q):findInEditor(q);
+  if(!findRanges.length){findClear();findCount.textContent='geen resultaten';return 0}
+  return findRanges.length;
+}
+function findPaint(){
+  if(!canHighlight)return;
+  CSS.highlights.delete('md-find');CSS.highlights.delete('md-find-current');
+  if(!findRanges.length)return;
+  try{CSS.highlights.set('md-find',new Highlight(...findRanges))}catch(e){return}
+  if(findRanges[findCur])CSS.highlights.set('md-find-current',new Highlight(findRanges[findCur]));
+}
+// Scrollpositie van een tekenpositie in de textarea benaderen via een spiegel-div
+function findScrollSource(pos){
+  const cs=getComputedStyle(src),mirror=document.createElement('div');
+  mirror.style.cssText='position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre-wrap;overflow-wrap:break-word;box-sizing:border-box;font:'+cs.font+';padding:'+cs.padding+';width:'+src.clientWidth+'px';
+  mirror.textContent=src.value.slice(0,pos);
+  const mark=document.createElement('span');mark.textContent='\u200b';mirror.appendChild(mark);
+  document.body.appendChild(mirror);
+  const y=mark.offsetTop;
+  mirror.remove();
+  src.scrollTop=Math.max(0,y-src.clientHeight/3);
+}
+function findShow(focusSource){
+  const total=findRanges.length;
+  if(!total)return;
+  if(findCur<0||findCur>=total)findCur=0;
+  findCount.textContent=(findCur+1)+'/'+total;
+  if(mode==='source'){
+    const m=findRanges[findCur];
+    if(focusSource)src.focus();
+    src.setSelectionRange(m.start,m.end);
+    findScrollSource(m.start);
+    return;
+  }
+  findPaint();
+  const r=findRanges[findCur];
+  if(!canHighlight){const s=getSelection();s.removeAllRanges();s.addRange(r)}
+  const el=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement;
+  if(el&&el.scrollIntoView)el.scrollIntoView({block:'center'});
+}
+function findStep(delta){
+  const total=findCollect();
+  if(!total)return;
+  findCur=findCur<0?(delta>0?0:total-1):(findCur+delta+total)%total;
+  findShow(true);
+}
+function findRun(){
+  findCollect();
+  if(findRanges.length){findCur=0;findShow(false)}
+}
+function openFind(){
+  findBar.classList.remove('hide');
+  findInput.focus();
+  findInput.select();
+  if(findInput.value)findRun();
+}
+function closeFind(){
+  findBar.classList.add('hide');
+  findClear();
+  findCount.textContent='';
+  if(mode==='source')src.focus();else ed.focus();
+}
+window.mdFind=function(action){
+  if(action==='open'||findBar.classList.contains('hide'))openFind();
+  else findStep(action==='prev'?-1:1);
+};
+findInput.addEventListener('input',findRun);
+findInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();findStep(e.shiftKey?-1:1)}
+  else if(e.key==='Escape'){e.preventDefault();closeFind()}
+});
+$('#findPrev').onclick=()=>findStep(-1);
+$('#findNext').onclick=()=>findStep(1);
+$('#findClose').onclick=closeFind;
+src.addEventListener('keydown',e=>{
+  if(findBar.classList.contains('hide'))return;
+  if(e.key==='Enter'){e.preventDefault();findStep(e.shiftKey?-1:1)}
+  else if(e.key==='Escape'){e.preventDefault();closeFind()}
+});
+// Vangnet als het native menu de toetsen niet afvangt
+document.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if((e.metaKey||e.ctrlKey)&&!e.altKey&&k==='z'){e.preventDefault();if(e.shiftKey)histRedoStep();else histUndoStep();return}
+  if((e.metaKey||e.ctrlKey)&&!e.altKey&&k==='y'){e.preventDefault();histRedoStep();return}
+  if((e.metaKey||e.ctrlKey)&&!e.altKey&&k==='f'){e.preventDefault();openFind();return}
+  if((e.metaKey||e.ctrlKey)&&!e.altKey&&k==='g'&&!findBar.classList.contains('hide')){e.preventDefault();findStep(e.shiftKey?-1:1);return}
+  if(e.key==='Escape'&&!findBar.classList.contains('hide')&&document.activeElement!==findInput)closeFind();
+});
 
 // Thema
 $('#bTheme').onclick=()=>{
@@ -1056,6 +1341,8 @@ Schrijf **vet**, *cursief* of ~~doorgehaald~~ in de editor, of wissel naar de *M
 - Typ \`# \` voor een kop, \`- \` voor een lijst, \`1. \` voor een genummerde lijst
 - Typ \`> \` voor een citaat, \`---\` voor een lijn
 - Ctrl+K voor een link, Ctrl+S om op te slaan; Cmd-klik opent een link
+- Cmd+F zoekt in het document (Cmd+G en Shift+Cmd+G gaan naar de volgende of vorige treffer)
+- De knop **PDF** in de werkbalk exporteert het hele document als PDF
 
 - [x] Editor gebouwd
 - [ ] Eigen document schrijven

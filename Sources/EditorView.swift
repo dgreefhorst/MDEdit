@@ -62,6 +62,8 @@ struct EditorView: NSViewRepresentable {
         var lastKind: String?
         var lastName: String?
         var modeObserver: NSObjectProtocol?
+        var findObserver: NSObjectProtocol?
+        var undoObserver: NSObjectProtocol?
         var lastOpen = Date.distantPast
 
         init(_ parent: EditorView) {
@@ -75,10 +77,28 @@ struct EditorView: NSViewRepresentable {
                       let mode = note.object as? String else { return }
                 web.evaluateJavaScript("document.querySelector('#modes [data-m=\"\(mode)\"]').click()", completionHandler: nil)
             }
+            findObserver = NotificationCenter.default.addObserver(
+                forName: .mdFind, object: nil, queue: .main
+            ) { [weak self] note in
+                guard let self = self, let web = self.web,
+                      web.window?.isKeyWindow == true else { return }
+                let action = note.object as? String ?? "open"
+                web.evaluateJavaScript("window.mdFind && window.mdFind('\(action)')", completionHandler: nil)
+            }
+            undoObserver = NotificationCenter.default.addObserver(
+                forName: .mdUndo, object: nil, queue: .main
+            ) { [weak self] note in
+                guard let self = self, let web = self.web,
+                      web.window?.isKeyWindow == true else { return }
+                let action = note.object as? String ?? "undo"
+                web.evaluateJavaScript("window.mdUndo && window.mdUndo('\(action)')", completionHandler: nil)
+            }
         }
 
         deinit {
             if let observer = modeObserver { NotificationCenter.default.removeObserver(observer) }
+            if let observer = findObserver { NotificationCenter.default.removeObserver(observer) }
+            if let observer = undoObserver { NotificationCenter.default.removeObserver(observer) }
         }
 
         // Het document in dit venster is leidend: na het wisselen van document
@@ -114,6 +134,14 @@ struct EditorView: NSViewRepresentable {
                     exportPDF(filename: filename,
                               width: payload["width"] as? Double ?? 800,
                               height: payload["height"] as? Double ?? 600)
+                    return
+                }
+                if payload["kind"] as? String == "docpdf" {
+                    let breaks = (payload["breaks"] as? [Any])?.compactMap { ($0 as? NSNumber)?.doubleValue } ?? []
+                    exportDocumentPDF(filename: filename,
+                                      width: payload["width"] as? Double ?? 642,
+                                      height: payload["height"] as? Double ?? 800,
+                                      breaks: breaks)
                     return
                 }
                 let data: Data
@@ -201,6 +229,82 @@ struct EditorView: NSViewRepresentable {
             } else {
                 handle(panel.runModal())
             }
+        }
+
+        // Heel document -> A4-PDF. De editor zet tijdelijk de klasse 'docpdf' op de
+        // pagina (alleen inhoud, licht thema, vaste breedte) en stuurt de breekpunten
+        // mee. WebKit's printfaciliteit is hier niet bruikbaar, dus maken we eerst één
+        // PDF van de volledige inhoud (createPDF) en knippen die in pagina's.
+        private func exportDocumentPDF(filename: String, width: Double, height: Double, breaks: [Double]) {
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = filename
+            panel.canCreateDirectories = true
+            let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+                guard let self = self, let web = self.web else { return }
+                guard response == .OK, let url = panel.url else { self.finishPDF(); return }
+                let config = WKPDFConfiguration()
+                config.rect = CGRect(x: 0, y: 0, width: max(24, width), height: max(24, height))
+                web.createPDF(configuration: config) { [weak self] result in
+                    guard let self = self else { return }
+                    defer { self.finishPDF() }
+                    guard case .success(let data) = result,
+                          let pdf = self.paginateDocumentPDF(data, breaks: breaks) else {
+                        self.notify("PDF maken mislukt")
+                        return
+                    }
+                    do {
+                        try pdf.write(to: url)
+                        self.notify("Geëxporteerd: " + url.lastPathComponent)
+                    } catch {
+                        self.notify("PDF opslaan mislukt")
+                    }
+                }
+            }
+            if let window = web?.window {
+                panel.beginSheetModal(for: window, completionHandler: handle)
+            } else {
+                handle(panel.runModal())
+            }
+        }
+
+        // Eén lange PDF-pagina opdelen in A4-pagina's op de aangeleverde breekpunten
+        private func paginateDocumentPDF(_ data: Data, breaks: [Double]) -> Data? {
+            guard let provider = CGDataProvider(data: data as CFData),
+                  let source = CGPDFDocument(provider),
+                  let page = source.page(at: 1) else { return nil }
+            let box = page.getBoxRect(.mediaBox)
+            guard box.width > 1, box.height > 1 else { return nil }
+            let pageSize = CGSize(width: 595.28, height: 841.89)
+            let margin: CGFloat = 56
+            let usable = CGSize(width: pageSize.width - 2 * margin, height: pageSize.height - 2 * margin)
+            let scale = min(usable.width / box.width, 72.0 / 96.0)
+            var cuts = breaks.filter { $0 > 0.5 && $0 < Double(box.height) - 0.5 }.sorted()
+            if cuts.isEmpty {
+                let sliceHeight = Double(usable.height / scale)
+                cuts = stride(from: sliceHeight, to: Double(box.height), by: sliceHeight).map { $0 }
+            }
+            let output = NSMutableData()
+            guard let consumer = CGDataConsumer(data: output as CFMutableData) else { return nil }
+            var mediaBox = CGRect(origin: .zero, size: pageSize)
+            guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return nil }
+            var start: CGFloat = 0
+            for cut in (cuts.map { CGFloat($0) } + [box.height]) {
+                guard cut > start + 0.5 else { continue }
+                context.beginPDFPage(nil)
+                context.saveGState()
+                context.clip(to: CGRect(x: margin, y: margin, width: usable.width, height: usable.height))
+                let drawWidth = box.width * scale
+                let x = margin + (usable.width - drawWidth) / 2
+                let top = box.height - start
+                context.translateBy(x: x, y: margin + usable.height - top * scale)
+                context.scaleBy(x: scale, y: scale)
+                context.drawPDFPage(page)
+                context.restoreGState()
+                context.endPDFPage()
+                start = cut
+            }
+            context.closePDF()
+            return output as Data
         }
 
         // Editor laten weten dat de PDF-export klaar is (herstelt de normale weergave)

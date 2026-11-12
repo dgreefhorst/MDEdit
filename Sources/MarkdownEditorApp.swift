@@ -8,6 +8,8 @@ extension UTType {
 
 extension Notification.Name {
     static let mdSetMode = Notification.Name("mdSetMode")
+    static let mdFind = Notification.Name("mdFind")
+    static let mdUndo = Notification.Name("mdUndo")
 }
 
 struct MarkdownDocument: FileDocument {
@@ -42,6 +44,15 @@ struct MarkdownEditorApp: App {
                 .background(WindowAccessor())
         }
         .commands {
+            // Ongedaan maken/opnieuw lopen via de eigen geschiedenis van de editor:
+            // de standaard undo van WebKit is onbruikbaar omdat de editor de DOM
+            // bij elke wijziging opnieuw opbouwt.
+            CommandGroup(replacing: .undoRedo) {
+                Button("Ongedaan maken") { NotificationCenter.default.post(name: .mdUndo, object: "undo") }
+                    .keyboardShortcut("z", modifiers: [.command])
+                Button("Opnieuw") { NotificationCenter.default.post(name: .mdUndo, object: "redo") }
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+            }
             CommandMenu("Weergave") {
                 Button("Editor") { NotificationCenter.default.post(name: .mdSetMode, object: "wysiwyg") }
                     .keyboardShortcut("1", modifiers: [.command, .option])
@@ -49,6 +60,14 @@ struct MarkdownEditorApp: App {
                     .keyboardShortcut("2", modifiers: [.command, .option])
                 Button("Markdown-bron") { NotificationCenter.default.post(name: .mdSetMode, object: "source") }
                     .keyboardShortcut("3", modifiers: [.command, .option])
+            }
+            CommandMenu("Zoeken") {
+                Button("Zoeken…") { NotificationCenter.default.post(name: .mdFind, object: "open") }
+                    .keyboardShortcut("f", modifiers: [.command])
+                Button("Volgende treffer") { NotificationCenter.default.post(name: .mdFind, object: "next") }
+                    .keyboardShortcut("g", modifiers: [.command])
+                Button("Vorige treffer") { NotificationCenter.default.post(name: .mdFind, object: "prev") }
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
             }
         }
     }
