@@ -15,7 +15,8 @@ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;b
 header h1{font-size:15px;margin:0 8px 0 0;font-weight:650}
 #autoWrap{display:flex;gap:4px;align-items:center;font-size:13px;color:var(--muted)}
 #autoWrap.hide{display:none}
-.tb{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+.tb{display:flex;flex-wrap:nowrap;gap:2px;align-items:center;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:thin}
+.tb .grp{flex-wrap:nowrap;flex:none}
 button,select{font:inherit;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px;cursor:pointer;min-height:30px}
 button:hover{background:var(--accent-soft)}
 button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
@@ -54,6 +55,9 @@ footer{display:flex;gap:16px;padding:4px 12px;font-size:12px;color:var(--muted);
 .grp{display:flex;flex-wrap:wrap;gap:2px;align-items:center}
 .ic{display:inline-flex;align-items:center;gap:5px}
 .ic svg{display:block;width:16px;height:16px}
+#tb .ic{padding:4px 6px}
+#tb select{max-width:96px}
+#modes{display:flex;gap:2px;flex:none}
 #modes button{padding:4px 7px}
 #imgDlg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:20}
 #imgDlg.hide{display:none}
@@ -138,25 +142,25 @@ html.docpdf #editor pre,html.docpdf #editor blockquote,html.docpdf #editor table
       <option value="p">Alinea</option><option value="h1">Kop 1</option><option value="h2">Kop 2</option><option value="h3">Kop 3</option><option value="h4">Kop 4</option><option value="blockquote">Citaat</option><option value="pre">Codeblok</option>
     </select>
     <span class="sep"></span>
-    <button data-c="bold" title="Vet (Ctrl+B)"><b>B</b></button>
-    <button data-c="italic" title="Cursief (Ctrl+I)"><i>I</i></button>
-    <button data-c="strikeThrough" title="Doorhalen"><s>S</s></button>
-    <button data-c="code" title="Inline code">&lt;/&gt;</button>
-    <button data-c="quote" id="bQuote" title="Citaat">❝ Citaat</button>
-    <button data-c="codeblock" id="bCodeBlock" title="Codeblok">{ } Codeblok</button>
+    <button data-c="bold" class="ic" title="Vet (Ctrl+B)" aria-label="Vet"><b>B</b></button>
+    <button data-c="italic" class="ic" title="Cursief (Ctrl+I)" aria-label="Cursief"><i>I</i></button>
+    <button data-c="strikeThrough" class="ic" title="Doorhalen" aria-label="Doorhalen"><s>S</s></button>
+    <button data-c="code" class="ic" title="Inline code" aria-label="Inline code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 8-4 4 4 4"/><path d="m14 8 4 4-4 4"/></svg></button>
+    <button data-c="quote" id="bQuote" class="ic" title="Citaat" aria-label="Citaat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v16"/><path d="M9 8h10"/><path d="M9 12h10"/><path d="M9 16h8"/></svg></button>
+    <button data-c="codeblock" id="bCodeBlock" class="ic" title="Codeblok" aria-label="Codeblok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9-3 3 3 3"/><path d="m14 9 3 3-3 3"/></svg></button>
     <span class="sep"></span>
-    <button data-c="insertUnorderedList" title="Opsomming">• Lijst</button>
-    <button data-c="insertOrderedList" title="Genummerde lijst">1. Lijst</button>
-    <button data-c="task" title="Takenlijst">☑ Taak</button>
+    <button data-c="insertUnorderedList" class="ic" title="Opsomming" aria-label="Opsomming"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg></button>
+    <button data-c="insertOrderedList" class="ic" title="Genummerde lijst" aria-label="Genummerde lijst"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h11"/><path d="M10 12h11"/><path d="M10 18h11"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></button>
+    <button data-c="task" class="ic" title="Takenlijst" aria-label="Takenlijst"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h11"/><path d="M10 12h11"/><path d="M10 18h11"/><path d="m3 6 1.5 1.5L7 5"/><path d="m3 12 1.5 1.5L7 11"/><path d="m3 18 1.5 1.5L7 17"/></svg></button>
     <span class="sep"></span>
-    <button data-c="link" title="Link (Ctrl+K)">Link</button>
-    <button data-c="image" title="Afbeelding invoegen (URL of bestand)">Afbeelding</button>
-    <button data-c="table" title="Tabel invoegen">Tabel</button>
-    <button data-c="insertHorizontalRule" title="Horizontale lijn">―</button>
+    <button data-c="link" class="ic" title="Link (Ctrl+K)" aria-label="Link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg></button>
+    <button data-c="image" class="ic" title="Afbeelding invoegen (URL of bestand)" aria-label="Afbeelding"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="m21 16-5-5-8 8"/></svg></button>
+    <button data-c="table" class="ic" title="Tabel invoegen" aria-label="Tabel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M12 4v16"/></svg></button>
+    <button data-c="insertHorizontalRule" class="ic" title="Horizontale lijn" aria-label="Horizontale lijn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12h16"/></svg></button>
     <span class="sep"></span>
-    <button data-c="undo" title="Ongedaan (Ctrl+Z)">↶</button>
-    <button data-c="redo" title="Opnieuw (Ctrl+Y)">↷</button>
-    <button data-c="removeFormat" title="Opmaak wissen">Tx</button>
+    <button data-c="undo" class="ic" title="Ongedaan (Ctrl+Z)" aria-label="Ongedaan maken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg></button>
+    <button data-c="redo" class="ic" title="Opnieuw (Ctrl+Y)" aria-label="Opnieuw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg></button>
+    <button data-c="removeFormat" class="ic" title="Opmaak wissen" aria-label="Opmaak wissen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4-4 9-9 4 4-9 9Z"/><path d="m14 7 3-3a2.8 2.8 0 0 1 4 4l-3 3"/><path d="M6 21h14"/></svg></button>
   </div>
   <span class="spacer"></span>
   <div id="modes">
@@ -165,11 +169,11 @@ html.docpdf #editor pre,html.docpdf #editor blockquote,html.docpdf #editor table
     <button data-m="source" class="ic" title="Markdown-bron" aria-label="Markdown-bron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg></button>
   </div>
   <span class="sep"></span>
-  <button id="bExpHtml" class="ic" title="Exporteren naar HTML"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>HTML</span></button>
-  <button id="bExpWord" class="ic" title="Exporteren naar MS Word"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Word</span></button>
-  <button id="bExpPdf" class="ic" title="Het document als PDF exporteren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>PDF</span></button>
-  <button id="bExpSvg" class="ic hide" title="Het diagram als SVG exporteren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>SVG</span></button>
-  <button id="bExpWiki" class="ic" title="Exporteren naar MediaWiki-markup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Wiki</span></button>
+  <button id="bExpHtml" class="ic" title="Exporteren naar HTML" aria-label="Exporteren naar HTML"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/></svg></button>
+  <button id="bExpWord" class="ic" title="Exporteren naar MS Word" aria-label="Exporteren naar MS Word"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5l3 14 4-9 4 9 3-14"/></svg></button>
+  <button id="bExpPdf" class="ic" title="Het document als PDF exporteren" aria-label="Exporteren naar PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg></button>
+  <button id="bExpSvg" class="ic hide" title="Het diagram als SVG exporteren" aria-label="Exporteren naar SVG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+  <button id="bExpWiki" class="ic" title="Exporteren naar MediaWiki-markup" aria-label="Exporteren naar MediaWiki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/></svg></button>
 </div>
 <div id="find" class="hide">
   <input id="findInput" type="search" placeholder="Zoeken in document…" spellcheck="false" autocomplete="off">
@@ -1285,7 +1289,6 @@ function openFind(){
   findBar.classList.remove('hide');
   findInput.focus();
   findInput.select();
-  if(findInput.value)findRun();
 }
 function closeFind(){
   findBar.classList.add('hide');
@@ -1297,7 +1300,7 @@ window.mdFind=function(action){
   if(action==='open'||findBar.classList.contains('hide'))openFind();
   else findStep(action==='prev'?-1:1);
 };
-findInput.addEventListener('input',findRun);
+findInput.addEventListener('input',()=>{findClear();findCount.textContent=''});
 findInput.addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();findStep(e.shiftKey?-1:1)}
   else if(e.key==='Escape'){e.preventDefault();closeFind()}
